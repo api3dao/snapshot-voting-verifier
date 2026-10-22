@@ -14,6 +14,8 @@ const proposalSchema = z.strictObject({
   type: z.string(),
   state: z.string(),
   title: z.string(),
+  author: addressSchema,
+  labels: z.array(z.string()),
   choices: z.array(z.string()),
   start: z.number().int(),
   end: z.number().int(),
@@ -68,7 +70,7 @@ const graphql = async (query: string, variables: Record<string, unknown>) => {
   return body.data;
 };
 
-const PROPOSAL_FIELDS = `id ipfs space { id } network type state title choices start end snapshot created votes
+const PROPOSAL_FIELDS = `id ipfs space { id } network type state title author labels choices start end snapshot created votes
   scores scores_by_strategy scores_total scores_state quorum strategies { name network params }`;
 
 export const fetchProposal = async (id: string) => {

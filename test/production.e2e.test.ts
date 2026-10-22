@@ -213,6 +213,12 @@ describe('wallets outside the fixture', () => {
 
     expectScore(scoreOf(power.own[1]!), of.pool);
   });
+
+  // TODO: the Treasury Safe 0xb7fa2Cb302C5dC127e61F27b92beC411cbf0AE4A delegates the api3.eth space to the dead address
+  // 0x000000000000000000000000000000000000dEaD once the space is set up. Until then it holds nothing and has no
+  // power. Once the delegation is on the registry, read the Treasury Safe with the api3.eth space id and assert
+  // delegatedTo is the dead address and score is 0, whatever it holds
+  it.todo('leaves the Treasury Safe with zero power, delegated to the dead address');
 });
 
 describe('score API agreement', () => {

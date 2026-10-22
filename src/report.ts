@@ -52,11 +52,25 @@ const formatVerdict = (verification: Verification) => {
   ];
 };
 
+// The space's rules next to the tally, one line per check for the signers to tick, and the outcome they act on
+const formatRules = (verification: Verification) => {
+  const { proposal, rules } = verification;
+  if (!rules) {
+    return [`No rule set for ${proposal.space.id}, the hub's quorum is ${formatScore(proposal.quorum)}`];
+  }
+  return [
+    `Rules of ${proposal.space.id}, checked on the recomputed result:`,
+    ...rules.checks.map((check) => `  ${check.ok ? 'ok  ' : 'FAIL'} ${check.text}`),
+    `Outcome: ${rules.outcome}`,
+  ];
+};
+
 export const formatReport = (verification: Verification) => {
   const { proposal, voters, scores, archiveDiff } = verification;
   const lines = [
     `Proposal ${proposal.id}`,
     `${proposal.space.id}: ${proposal.title}`,
+    `Labels ${proposal.labels.length > 0 ? proposal.labels.join(', ') : 'none'}, proposed by ${proposal.author}`,
     `State ${proposal.state}, hub scores ${proposal.scores_state}, ${voters.length} votes`,
     `Snapshot block ${proposal.snapshot} at ${formatDate(verification.snapshotTimestamp)}, proposal signed ${formatDate(proposal.created)}, received by the hub after ${formatDate(verification.receivedAfter)}`,
     `Voting ${formatDate(proposal.start)} to ${formatDate(proposal.end)}`,
@@ -67,7 +81,8 @@ export const formatReport = (verification: Verification) => {
       (choice, index) =>
         `  ${choice}: ${formatScore(scores[index]!)}, ${formatScore(proposal.scores[index] ?? Number.NaN)}`
     ),
-    `  quorum ${formatScore(proposal.quorum)}`,
+    '',
+    ...formatRules(verification),
     '',
     `Votes archived to ${verification.archiveFile}`,
     ...(archiveDiff ? formatArchiveDiff(archiveDiff) : []),
