@@ -2,6 +2,7 @@
   "name": "snapshot-voting-verifier",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Recomputes a Snapshot proposal's result from the chain and tells the signers whether they may execute it",
   "scripts": {
     "verify": "ts-node --transpileOnly src/cli/verify.ts",
