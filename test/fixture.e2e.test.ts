@@ -219,12 +219,11 @@ describe('hub agreement on the fixture proposal', () => {
 
     const pending = verification.proposal.scores_state === 'final' ? [] : ['hub scores are pending, not final'];
 
-    // The fixture proposal predates the rehearsal settings of the sandbox space: no label, the old seven day period
-    // and the old quorum, which the sandbox rule set reports as bypassed
+    // The fixture proposal predates the rehearsal settings of the sandbox space: no label and the old quorum, which
+    // the sandbox rule set reports as bypassed
     expect(verification.problems).toEqual([
       ...pending,
       'rule bypassed: labels [], exactly one of routine and struct is needed',
-      'rule bypassed: voting period of 604800 seconds, 1800 expected',
       `rule bypassed: quorum of ${(1e25).toLocaleString('en-US')} set on the proposal, 300 expected`,
     ]);
     expect(verification.rules?.outcome).toBe('not to be executed, a rule was bypassed');

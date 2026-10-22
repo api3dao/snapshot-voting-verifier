@@ -24,12 +24,13 @@ export const RULE_SETS: Record<string, RuleSet> = {
     minScore: { routine: 500_000, structural: 5_000_000 },
     labels: LABELS,
   },
-  // The rehearsal space, running the production settings with the thresholds scaled and the timing shortened. The
-  // structural threshold is no setting at all, so it is scaled like the routine one
+  // The rehearsal space, running the production settings with the thresholds scaled, a minute of delay and, since
+  // 2026-10-22, the production week of voting (the rounds of 2026-10-20 ran 30 minutes). The structural threshold is
+  // no setting at all, so it is scaled like the routine one
   'testing-new-d-ignore-xyz-a.eth': {
     quorum: 300,
     delay: 60,
-    period: 1800,
+    period: 7 * 86_400,
     minScore: { routine: 5, structural: 50 },
     labels: LABELS,
   },
