@@ -1,0 +1,21 @@
+{
+  "extends": ["plugin:@api3/eslint-plugin-commons/universal"],
+  "rules": {
+    "no-console": "off",
+    "prefer-named-capture-group": "off",
+    "sort-keys": "off",
+    "camelcase": "off",
+    "promise/param-names": "off",
+    "lodash/prefer-lodash-typecheck": "off",
+    "check-file/folder-naming-convention": "off",
+    "jest/require-hook": "off"
+  },
+  "parserOptions": {
+    "project": ["./tsconfig.json"]
+  },
+  "settings": {
+    "jest": {
+      "version": 29
+    }
+  }
+}
