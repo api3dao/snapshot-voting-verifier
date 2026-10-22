@@ -9,6 +9,8 @@ It also checks the proposal against rules that Snapshot does not enforce:
 - The snapshot block lies between 64 and 300 blocks before the hub received the proposal. The author picks the block and Snapshot only checks that it exists, so the floor keeps it final and the ceiling keeps a proposer from counting balances from years ago.
 - The signed timestamp precedes the receipt by at most an hour. Snapshot accepts a timestamp up to six days old, which sets `start` and would shorten the voting window. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
 
+For `api3.eth` it then prints the space's rules next to the tally, one line per check for the signers to tick, judged on the recomputed result: the proposal is a basic one labelled Routine or Structural, the proposer held 500,000 or 5,000,000 API3 at the snapshot block, voting opened at the signed timestamp and ran seven days, the quorum of 10,000,000 counts abstain, and the majority is more for than against for a Routine proposal and two thirds of for and against for a Structural one. A check the proposal bypassed (a label missing, a proposer below the threshold, a shifted window, a changed quorum) is a problem like any other and the run ends `NOT VERIFIED`. The quorum and the majority only decide the outcome, which the report states in one line.
+
 Supported: `basic` and `single-choice` proposals, and the strategies `with-delegation` over `erc20-balance-of`, `contract-call` and `math` (Snapshot's operations, in floats, as the score API computes them). Anything else fails loudly rather than being skipped.
 
 ## Running

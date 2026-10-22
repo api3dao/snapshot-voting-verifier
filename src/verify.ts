@@ -4,6 +4,7 @@ import { BlockNotFoundError, type PublicClient } from 'viem';
 import { archiveVotes } from './archive';
 import { type HubProposal, type HubVote, fetchProposal, fetchReceivedAfter, fetchVotes } from './hub';
 import { type StrategyPower, computePowers } from './power';
+import { RULE_SETS, type RulesResult, checkRules } from './rules';
 import { verifyVoteSignature } from './signature';
 import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
 
@@ -83,6 +84,10 @@ export type Verification = {
   archiveDiff: ReturnType<typeof archiveVotes>['diff'];
   voters: VoterResult[];
   scores: number[];
+  // The proposer's power at the snapshot block
+  authorPower: number;
+  // The space's rules checked on the recomputed result, null for a space without a known rule set
+  rules: RulesResult | null;
   problems: string[];
 };
 
@@ -113,14 +118,19 @@ export const verifyProposal = async (
     })
   );
 
+  // The proposer's power is read along with the voters', at the same block
   const voterAddresses = votes.map((vote) => vote.voter);
+  const addresses = [...new Set([...voterAddresses, proposal.author])];
   const strategyPowers = await computePowers(
     client,
     proposal.space.id,
     proposal.strategies,
-    voterAddresses,
+    addresses,
     proposal.snapshot
   );
+  const authorIndex = addresses.indexOf(proposal.author);
+  let authorPower = 0;
+  for (const strategyPower of strategyPowers) authorPower += strategyPower.powers[authorIndex]!.score;
 
   const voters: VoterResult[] = [];
   for (const [index, vote] of votes.entries()) {
@@ -161,6 +171,12 @@ export const verifyProposal = async (
     }
   }
 
+  const ruleSet = RULE_SETS[proposal.space.id];
+  const rules = ruleSet ? checkRules(ruleSet, proposal, scores, proposal.author, authorPower) : null;
+  for (const check of rules?.checks ?? []) {
+    if (!check.ok && check.bypass) problems.push(`rule bypassed: ${check.text}`);
+  }
+
   return {
     proposal,
     snapshotTimestamp,
@@ -169,6 +185,8 @@ export const verifyProposal = async (
     archiveDiff: archive.diff,
     voters,
     scores,
+    authorPower,
+    rules,
     problems,
   };
 };
