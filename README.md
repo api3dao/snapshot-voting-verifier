@@ -2,14 +2,44 @@
 
 Recomputes the result of a Snapshot proposal from the chain and says whether the result the Snapshot site shows is the one the signers may execute. Built for the `api3.eth` space, where the multisig signers execute only a result they recomputed, never one read off a website. It works for any space whose strategies it supports.
 
-For every vote it recomputes the voter's power at the proposal's snapshot block with the proposal's own strategies, reading balances and contract state straight from an archive RPC and delegations from the delegate registry's events, without Snapshot's score API or subgraph in the loop. It fetches each vote's pinned object, checks the CID, the EIP-712 hash and the signature against the voter, checks that the vote was cast inside the voting window, sums the choices, and compares everything with the hub.
+## What it checks
 
-It also checks the proposal against rules that Snapshot does not enforce:
+Section 4 of the DAO migration proposal is the specification. Every check below implements a sentence of it or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome, noted below.
 
-- The snapshot block is not later than the signed timestamp and at most 7,200 blocks, about a day, before the hub received the proposal. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine.
-- The signed timestamp precedes the receipt by at most a day. Snapshot accepts a timestamp up to six days old, which sets `start` and would shorten the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal, at the cost of up to a day of the seven. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
+What the hub has to show:
 
-For `api3.eth` it then prints the space's rules next to the tally, one line per check for the signers to tick, judged on the recomputed result: the proposal is a basic one, the proposer held 500,000 API3 at the snapshot block, voting opened at the signed timestamp and ran seven days, the quorum set on the proposal is 10,000,000, at least that much was cast in favour (Snapshot's own quorum counts every vote, this one only the votes for, an abstain cast through the API counts for nothing), and there are more votes for than against. A check the proposal bypassed (a proposer below the threshold, a shifted window, a changed quorum) is a problem like any other and the run ends `NOT VERIFIED`. The quorum and the majority only decide the outcome, which the report states in one line.
+- The proposal is a `basic` or `single-choice` one, anything else stops the run.
+- The hub lists as many votes as it counts for the proposal.
+- The hub marks the proposal's scores and every vote's power final.
+
+What the proposal has to satisfy:
+
+- The snapshot block is not later than the signed timestamp and at most 7,200 blocks, about a day, before the proposal was posted, the later of the signed timestamp and the hub's receipt, section 4.1. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine.
+- The signed timestamp precedes the hub's receipt by at most a day, or half the delay on a space with a delay shorter than two days. Snapshot accepts a timestamp up to six days old, which sets `start` and would shorten the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal, at the cost of up to a day of the seven. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
+
+What every vote has to satisfy:
+
+- Its pinned object is fetched by the CID the hub lists and the CID is recomputed from the content.
+- The pinned object's address and the signed `from` are the voter, the signed space and proposal are the proposal's, and the signed choice and timestamp are the ones the hub lists.
+- The EIP-712 types are a vote's, and the hash of the typed data equals the pinned hash and the hub's vote id.
+- The signature is valid for the voter, a wallet's directly and a contract's through EIP-1271, checked against the chain's latest state.
+- The choice is an option of the proposal and the vote was cast between `start` and `end`.
+- The voter's power recomputed at the snapshot block with the proposal's own strategies equals what the hub lists, in total and per strategy, within one part in a billion. Balances and contract state come straight from an archive RPC and delegations from the delegate registry's events, without Snapshot's score API or subgraph in the loop.
+
+What the tally has to satisfy:
+
+- The recomputed powers summed per choice equal the hub's scores, within the same tolerance.
+
+The rules of `api3.eth`, printed next to the tally for the signers to tick and judged on the recomputed result:
+
+- The proposal is a basic one with the choices For, Against and Abstain.
+- The proposer held 500,000 API3 at the snapshot block, section 4.2. The sequencer checked the latest block when it received the proposal.
+- Voting opened at the signed timestamp, no delay, and ran seven days.
+- The quorum set on the proposal is 10,000,000.
+- At least 10,000,000 was cast in favour, section 4.3. Snapshot's own quorum counts every vote, this one only the votes for, and an abstain cast through the API counts for nothing.
+- There are more votes for than against.
+
+A failed check among the first four rules means the proposal bypassed the space's settings and is a problem like any other. The last two only decide the outcome, which the report states in one line. The tool does not judge whether a proposal is a rule change under section 4.4 or date its 30 days, that is the signers' reading of the content.
 
 Supported: `basic` and `single-choice` proposals, and the strategies `with-delegation` over `erc20-balance-of`, `contract-call` and `math` (Snapshot's operations, in floats, as the score API computes them). Anything else fails loudly rather than being skipped.
 
@@ -39,7 +69,7 @@ pnpm run power --space api3.eth --address 0x<holder> --block 25000000
 
 `test/api3-eth-settings.json` is a copy of the settings the `api3.eth` space is created from. `test/production.e2e.test.ts` runs its strategies at a recent block over the fixture wallets, the Vault Safe with its delegated pool stake and a holder with Kabu market collateral, and checks every source against the raw reads and every wallet against the score API.
 
-## Checks
+## Development checks
 
 - `pnpm run tsc`, `pnpm run eslint:check`, `pnpm run prettier:check`
 - `pnpm run test` runs the unit tests and, against the RPC, the three end-to-end tests above
