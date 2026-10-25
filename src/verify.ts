@@ -10,11 +10,11 @@ import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
 
 export const SUPPORTED_PROPOSAL_TYPES = ['basic', 'single-choice'];
 
-// Reorgs cannot reach a block this deep, two epochs of finality
-export const MIN_SNAPSHOT_AGE_BLOCKS = 64n;
-// And no deeper than this. The author picks the snapshot block and the sequencer only checks that the block exists,
-// so without a ceiling a proposal could count balances from years ago, tokens since sold and delegations since
-// revoked included. About an hour of blocks, enough to post against a block that is already final.
+// The snapshot block may be no deeper than this. The author picks it and the sequencer only checks that the block
+// exists, so without a ceiling a proposal could count balances from years ago, tokens since sold and delegations
+// since revoked included. About an hour of blocks. There is no floor: snapshot.box picks the latest block, and a
+// reorg in the first minutes cannot reach the result, since the hub recomputes every vote's power until the proposal
+// closes and this tool reads after finality
 export const MAX_SNAPSHOT_AGE_BLOCKS = 300n;
 
 // A proposal's `created` is the timestamp its author signed, and the sequencer takes one up to six days old. Since
@@ -34,20 +34,17 @@ export const timestampProblems = (created: number, receivedAfter: number, delay:
       ]
     : [];
 
-// Block timestamps around the snapshot block: the block itself, the block MIN_SNAPSHOT_AGE_BLOCKS after it, and the
-// block MAX_SNAPSHOT_AGE_BLOCKS after it, undefined while that one is not mined yet
-export type SnapshotNeighbourhood = { snapshot: number; afterMinAge: number; afterMaxAge: number | undefined };
+// Block timestamps around the snapshot block: the block itself and the block MAX_SNAPSHOT_AGE_BLOCKS after it,
+// undefined while that one is not mined yet
+export type SnapshotNeighbourhood = { snapshot: number; afterMaxAge: number | undefined };
 
-// The snapshot block has to be between MIN and MAX blocks before the proposal was posted, judged by when the blocks
-// that far after it were mined. The floor is judged against the signed timestamp, the ceiling against the later of
-// that and the hub's receipt bound, so a backdated signature cannot age the block into the window
+// The snapshot block may not be later than the signed timestamp, and no more than MAX blocks before the proposal was
+// posted, judged by when the block that far after it was mined. The ceiling is judged against the later of the
+// signed timestamp and the hub's receipt bound, so a backdated signature cannot age the block into the window
 export const snapshotAgeProblems = (created: number, receivedAfter: number, blocks: SnapshotNeighbourhood) => {
   const posted = Math.max(created, receivedAfter);
   const problems: string[] = [];
   if (blocks.snapshot > created) problems.push('snapshot block is later than the proposal creation');
-  if (blocks.afterMinAge > created) {
-    problems.push(`snapshot block is fewer than ${MIN_SNAPSHOT_AGE_BLOCKS} blocks before the proposal creation`);
-  }
   if (blocks.afterMaxAge !== undefined && blocks.afterMaxAge < posted) {
     problems.push(`snapshot block is more than ${MAX_SNAPSHOT_AGE_BLOCKS} blocks before the proposal was posted`);
   }
@@ -113,7 +110,6 @@ export const verifyProposal = async (
   problems.push(
     ...snapshotAgeProblems(proposal.created, receivedAfter, {
       snapshot: snapshotTimestamp,
-      afterMinAge: await blockTimestamp(client, proposal.snapshot + MIN_SNAPSHOT_AGE_BLOCKS),
       afterMaxAge: await blockTimestampIfMined(client, proposal.snapshot + MAX_SNAPSHOT_AGE_BLOCKS),
     })
   );
