@@ -37,6 +37,11 @@ describe('snapshotAgeProblems', () => {
     expect(snapshotAgeProblems(created, receivedAfter, { ...neighbourhood(100n), afterMaxAge: undefined })).toEqual([]);
   });
 
+  it('accepts a block of the latest kind delivered a day after it was signed, the Safe case', () => {
+    // Signed against the latest block, received a day later: the block is at the maximum age at receipt
+    expect(snapshotAgeProblems(created, created + 86_400, neighbourhood(0n))).toEqual([]);
+  });
+
   it('rejects a block one past the maximum age', () => {
     expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(MAX_SNAPSHOT_AGE_BLOCKS + 1n))).toEqual([tooOld]);
   });
@@ -60,7 +65,7 @@ describe('snapshotAgeProblems', () => {
 });
 
 describe('timestampTolerance', () => {
-  it('is an hour on a space with a long delay and half the delay on a short one', () => {
+  it('is a day on a space with a long delay and half the delay on a short one', () => {
     expect(timestampTolerance(TWO_DAYS)).toBe(TIMESTAMP_TOLERANCE_SECONDS);
     expect(timestampTolerance(60)).toBe(30);
     expect(timestampTolerance(0)).toBe(TIMESTAMP_TOLERANCE_SECONDS);

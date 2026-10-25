@@ -12,17 +12,20 @@ export const SUPPORTED_PROPOSAL_TYPES = ['basic', 'single-choice'];
 
 // The snapshot block may be no deeper than this. The author picks it and the sequencer only checks that the block
 // exists, so without a ceiling a proposal could count balances from years ago, tokens since sold and delegations
-// since revoked included. About an hour of blocks. There is no floor: snapshot.box picks the latest block, and a
-// reorg in the first minutes cannot reach the result, since the hub recomputes every vote's power until the proposal
-// closes and this tool reads after finality
-export const MAX_SNAPSHOT_AGE_BLOCKS = 300n;
+// since revoked included. About a day of blocks, the same day the signed timestamp gets below, so a proposal signed
+// with the latest block and delivered within the day passes both. There is no floor: snapshot.box picks the latest
+// block, and a reorg in the first minutes cannot reach the result, since the hub recomputes every vote's power until
+// the proposal closes and this tool reads after finality
+export const MAX_SNAPSHOT_AGE_BLOCKS = 7200n;
 
 // A proposal's `created` is the timestamp its author signed, and the sequencer takes one up to six days old. Since
 // `start` has to be `created` plus the space's delay and `end` is `start` plus the period, a backdated signature
 // opens voting early and shortens it, and moves the window the snapshot block is judged against. The hub's receipt
-// time is the reference instead. A sender who signs and sends within the hour, or within half the delay on a space
-// with a delay shorter than two hours, is never flagged
-export const TIMESTAMP_TOLERANCE_SECONDS = 3600;
+// time is the reference instead. A sender who signs and sends within a day, or within half the delay on a space
+// with a delay shorter than two days, is never flagged. A day rather than an hour because a Safe signs a proposal
+// first and delivers it once the other owners have signed, and the voting window is seven days from the signature,
+// so a late delivery costs the proposal that much of it
+export const TIMESTAMP_TOLERANCE_SECONDS = 86_400;
 
 export const timestampTolerance = (delay: number) =>
   delay > 0 ? Math.min(TIMESTAMP_TOLERANCE_SECONDS, Math.floor(delay / 2)) : TIMESTAMP_TOLERANCE_SECONDS;
