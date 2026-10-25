@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MAX_SNAPSHOT_AGE_BLOCKS,
-  MIN_SNAPSHOT_AGE_BLOCKS,
   TIMESTAMP_TOLERANCE_SECONDS,
   snapshotAgeProblems,
   timestampProblems,
@@ -12,14 +11,11 @@ import {
 const created = 1_792_500_000;
 const SLOT = 12;
 const TWO_DAYS = 2 * 86_400;
-const tooFresh = `snapshot block is fewer than ${MIN_SNAPSHOT_AGE_BLOCKS} blocks before the proposal creation`;
 const tooOld = `snapshot block is more than ${MAX_SNAPSHOT_AGE_BLOCKS} blocks before the proposal was posted`;
 
-// The timestamps of the snapshot block and of the blocks MIN and MAX after it, for a snapshot `age` blocks before
-// `reference`
+// The timestamps of the snapshot block and of the block MAX after it, for a snapshot `age` blocks before `reference`
 const neighbourhood = (age: bigint, reference = created) => ({
   snapshot: reference - Number(age) * SLOT,
-  afterMinAge: reference - Number(age - MIN_SNAPSHOT_AGE_BLOCKS) * SLOT,
   afterMaxAge: reference - Number(age - MAX_SNAPSHOT_AGE_BLOCKS) * SLOT,
 });
 
@@ -27,27 +23,18 @@ const neighbourhood = (age: bigint, reference = created) => ({
 const receivedAfter = created - 5;
 
 describe('snapshotAgeProblems', () => {
-  it('accepts a block between the minimum and the maximum age', () => {
-    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(100n))).toEqual([]);
+  it("accepts Snapshot's default, the latest block at creation", () => {
+    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(1n))).toEqual([]);
+    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(0n))).toEqual([]);
   });
 
-  it('accepts the bounds themselves', () => {
-    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(MIN_SNAPSHOT_AGE_BLOCKS))).toEqual([]);
+  it('accepts a block up to the maximum age', () => {
+    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(100n))).toEqual([]);
     expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(MAX_SNAPSHOT_AGE_BLOCKS))).toEqual([]);
   });
 
   it('accepts a recent block whose maximum age block is not mined yet', () => {
     expect(snapshotAgeProblems(created, receivedAfter, { ...neighbourhood(100n), afterMaxAge: undefined })).toEqual([]);
-  });
-
-  it("rejects Snapshot's default, the latest block at creation", () => {
-    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(1n))).toEqual([tooFresh]);
-  });
-
-  it('rejects a block one short of the minimum age', () => {
-    expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(MIN_SNAPSHOT_AGE_BLOCKS - 1n))).toEqual([
-      tooFresh,
-    ]);
   });
 
   it('rejects a block one past the maximum age', () => {
@@ -61,7 +48,6 @@ describe('snapshotAgeProblems', () => {
   it('rejects a block after the creation', () => {
     expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(-5n))).toEqual([
       'snapshot block is later than the proposal creation',
-      tooFresh,
     ]);
   });
 

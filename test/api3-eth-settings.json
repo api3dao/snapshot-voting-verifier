@@ -271,7 +271,7 @@
     "delay": 0,
     "period": 604800,
     "quorum": 10000000,
-    "hideAbstain": false,
+    "hideAbstain": true,
     "privacy": ""
   },
   "validation": {
@@ -286,20 +286,7 @@
   "filters": {
     "onlyMembers": false
   },
-  "labels": [
-    {
-      "id": "routine",
-      "name": "Routine",
-      "description": "Within the mandate. Passes with more for than against.",
-      "color": "#1D4ED8"
-    },
-    {
-      "id": "struct",
-      "name": "Structural",
-      "description": "Replaces a multisig, changes a rule or the charter, or spends above the limit. Two thirds in favour.",
-      "color": "#B91C1C"
-    }
-  ],
+  "labels": [],
   "treasuries": [
     {
       "name": "Vault",

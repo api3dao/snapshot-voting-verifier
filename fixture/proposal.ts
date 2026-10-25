@@ -6,9 +6,11 @@ import { type Account, privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
 
 import { fetchSpace } from '../src/hub';
-import { MIN_SNAPSHOT_AGE_BLOCKS } from '../src/verify';
 
 import { AGENT, SPACE, WALLETS, fixtureAccount } from './wallets';
+
+// The fixture proposal is posted against a block this far back, inside the verifier's window
+const SNAPSHOT_BLOCKS_BACK = 64n;
 
 // Publishes the fixture proposal from the agent wallet and casts the two votes, all as EIP-712 signatures sent to
 // Snapshot's sequencer. Gasless, nothing here touches the chain.
@@ -90,7 +92,7 @@ const main = async () => {
   if (values.create) {
     if (!values['rpc-url']) throw new Error('--rpc-url is required to pick the snapshot block');
     const client = createPublicClient({ chain: mainnet, transport: http(values['rpc-url']) });
-    const snapshot = (await client.getBlockNumber()) - MIN_SNAPSHOT_AGE_BLOCKS;
+    const snapshot = (await client.getBlockNumber()) - SNAPSHOT_BLOCKS_BACK;
     const timestamp = now();
     const start = timestamp + 60;
     const message = {
