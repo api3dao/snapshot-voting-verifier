@@ -194,6 +194,61 @@ describe('a wallet that delegated to another', () => {
   }
 });
 
+// A, B and C are the fixture's staker, delegator and agent wallet. A holds API3 in every place the file reads and
+// delegated inside the pool to B, B delegated in the registry to C. The pool delegation carries A's stake only, the
+// registry delegation carries everything B has, A's stake included
+describe('what a delegation carries, A pool-delegated to B, B registry-delegated to C', () => {
+  const [A, B, C] = [staker.address, delegator.address, AGENT];
+
+  it('A keeps its liquid, deposited, unstaking and collateral API3, only the stake followed the pool delegation', () => {
+    const of = holdings[A]!;
+    const power = powers[A]!;
+    const [liquid, pool, deposited, unstaking, collateral] = power.own.map((score) => scoreOf(score)) as [
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+
+    expect(power.delegatedTo).toBeNull();
+    expect(of.staked).toBeGreaterThan(0n);
+    expect(pool).toBe(0);
+
+    expectScore(liquid, asFloat(of.liquid));
+    expectScore(deposited, asFloat(of.deposited));
+    expectScore(unstaking, asFloat(of.unstaking));
+    expectScore(collateral, asFloat(of.collateral));
+  });
+
+  it("B counts A's stake through the pool, and the registry delegation hands all of B, A's stake included, to C", () => {
+    const of = holdings[B]!;
+    const power = powers[B]!;
+
+    expect(power.delegatedTo).toBe(C);
+    // userStake rounds each stake down to a wei, the shares behind userVotingPower do not
+    expect(Math.abs(of.pool - asFloat(holdings[A]!.staked + of.staked))).toBeLessThan(asFloat(2n));
+
+    expectScore(scoreOf(power.own[1]!), of.pool);
+
+    const bInC = powers[C]!.delegators.find((holder) => holder.address === B)!;
+
+    expectScore(scoreOf(bInC.scores[1]!), of.pool);
+    expectScore(sumScores(bInC.scores), totalPower(of));
+  });
+
+  it("C votes with A's stake and with nothing else of A's, which stays with A", () => {
+    const power = powers[C]!;
+    const delegators = power.delegators.map((holder) => holder.address);
+
+    expect(delegators).toContain(B);
+    expect(delegators).not.toContain(A);
+    expect(power.score).toBeGreaterThanOrEqual(asFloat(holdings[A]!.staked));
+
+    expectScore(power.score, totalPower(holdings[C]!) + totalPower(holdings[vesting]!) + totalPower(holdings[B]!));
+  });
+});
+
 describe('wallets outside the fixture', () => {
   it('counts the Kabu market collateral of a holder', () => {
     const of = holdings[KABU_COLLATERAL_HOLDER]!;
