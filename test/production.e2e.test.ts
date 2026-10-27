@@ -28,6 +28,12 @@ const BLOCKS_BEHIND_HEAD = 64n;
 
 const VAULT: Address = '0x8e03609ed680b237c7b6f8020472ca0687308b24';
 const KABU_COLLATERAL_HOLDER: Address = '0x1946a1dd383fe3c3cd9ae3066c638ef6ed7e35e5';
+// The two Safes that hold the DAO's API3 after the migration vote, both delegated to the dead address under the
+// production space id since 2026-10-26, so what they hold votes for nobody
+const PRODUCTION_SPACE = 'api3.eth';
+const TREASURY_SAFE: Address = '0xb7fa2cb302c5dc127e61f27b92bec411cbf0ae4a';
+const AGENT_SAFE: Address = '0xbbe0de9757f93e3306adbfebe906ab285edd13da';
+const DEAD: Address = '0x000000000000000000000000000000000000dead';
 
 if (!VESTING) throw new Error('The fixture vesting is not recorded');
 const vesting = VESTING;
@@ -269,11 +275,20 @@ describe('wallets outside the fixture', () => {
     expectScore(scoreOf(power.own[1]!), of.pool);
   });
 
-  // TODO: the Treasury Safe 0xb7fa2Cb302C5dC127e61F27b92beC411cbf0AE4A delegates the api3.eth space to the dead address
-  // 0x000000000000000000000000000000000000dEaD once the space is set up. Until then it holds nothing and has no
-  // power. Once the delegation is on the registry, read the Treasury Safe with the api3.eth space id and assert
-  // delegatedTo is the dead address and score is 0, whatever it holds
-  it.todo('leaves the Treasury Safe with zero power, delegated to the dead address');
+  // Their delegations are keyed by the production space id, the fixture's by the sandbox's, so they are read apart
+  it('leaves the Treasury Safe and the Agent Safe with zero power, delegated to the dead address', async () => {
+    const safes: Address[] = [TREASURY_SAFE, AGENT_SAFE];
+    const [safePowers] = await computePowers(client, PRODUCTION_SPACE, strategies, safes, blockNumber);
+    const agentHoldings = await readHoldings(client, AGENT_SAFE, morphoMarketIdOf(strategies), blockNumber);
+
+    // The Agent Safe holds API3 of its own, so a zero score is the delegation at work, not an empty wallet
+    expect(agentHoldings.liquid).toBeGreaterThan(0n);
+
+    for (const power of safePowers!.powers) {
+      expect(power.delegatedTo).toBe(DEAD);
+      expect(power.score).toBe(0);
+    }
+  });
 });
 
 describe('score API agreement', () => {
