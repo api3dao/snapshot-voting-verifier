@@ -2,7 +2,7 @@ import { go } from '@api3/promise-utils';
 import { BlockNotFoundError, type PublicClient } from 'viem';
 
 import { archiveVotes } from './archive';
-import { type HubProposal, type HubVote, fetchProposal, fetchProposalTimes, fetchVotes } from './hub';
+import { type HubProposal, type HubVote, fetchProposal, fetchReceivedAfter, fetchVotes } from './hub';
 import { type StrategyPower, computePowers } from './power';
 import { RULE_SETS, type RulesResult, checkRules } from './rules';
 import { verifyVoteSignature } from './signature';
@@ -10,43 +10,19 @@ import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
 
 export const SUPPORTED_PROPOSAL_TYPES = ['basic', 'single-choice'];
 
-// The snapshot block may be no deeper than this. The author picks it and the sequencer only checks that the block
-// exists, so without a ceiling a proposal could count balances from years ago, tokens since sold and delegations
-// since revoked included. About a day of blocks, the same day the signed timestamp gets below, so a proposal signed
-// with the latest block and delivered within the day passes both. There is no floor: snapshot.box picks the latest
-// block, and a reorg in the first minutes cannot reach the result, since the hub recomputes every vote's power until
-// the proposal closes and this tool reads after finality
+// The snapshot block may be no deeper than this before the hub received the proposal (section 4.1 of the migration
+// proposal). The author picks it and the sequencer only checks that the block exists, so without a ceiling a proposal
+// could count balances from years ago, tokens since sold and delegations since revoked included. About a day of
+// blocks, so a Safe that signs a proposal with the latest block has a day to collect the other signatures and deliver
+// it. There is no floor: snapshot.box picks the latest block, and a reorg in the first minutes cannot reach the
+// result, since the hub recomputes every vote's power until the proposal closes and this tool reads after finality
 export const MAX_SNAPSHOT_AGE_BLOCKS = 7200n;
 
-// The sequencer takes a signed timestamp up to six days old. Since 2026-10-26 at the latest, the hub sets a proposal's
-// `created` to when it received the proposal whenever the signed timestamp is earlier, and moves `start` and `end`
-// with it, so a backdated signature no longer shortens voting. Until then `created` was the signed timestamp. The
-// signed timestamp stays in the hub's message record, and the DAO still wants it within a day of the receipt
-// (section 4.1 of the migration proposal). A day rather than an hour because a Safe signs a proposal first and
-// delivers it once the other owners have signed
-export const TIMESTAMP_TOLERANCE_SECONDS = 86_400;
-
-export const timestampProblems = (signed: number, receivedAfter: number) =>
-  signed + TIMESTAMP_TOLERANCE_SECONDS < receivedAfter
-    ? [`proposal was signed ${receivedAfter - signed} seconds before the hub received it, more than a day`]
+// Judged by when the block MAX_SNAPSHOT_AGE_BLOCKS after the snapshot block was mined, undefined while it is not yet
+export const snapshotAgeProblems = (receivedAfter: number, afterMaxAge: number | undefined) =>
+  afterMaxAge !== undefined && afterMaxAge < receivedAfter
+    ? [`snapshot block is more than ${MAX_SNAPSHOT_AGE_BLOCKS} blocks before the hub received the proposal`]
     : [];
-
-// Block timestamps around the snapshot block: the block itself and the block MAX_SNAPSHOT_AGE_BLOCKS after it,
-// undefined while that one is not mined yet
-export type SnapshotNeighbourhood = { snapshot: number; afterMaxAge: number | undefined };
-
-// The snapshot block may not be later than the signed timestamp, and no more than MAX blocks before the proposal was
-// posted, judged by when the block that far after it was mined. The ceiling is judged against the later of the
-// signed timestamp and the hub's receipt bound, so a backdated signature cannot age the block into the window
-export const snapshotAgeProblems = (signed: number, receivedAfter: number, blocks: SnapshotNeighbourhood) => {
-  const posted = Math.max(signed, receivedAfter);
-  const problems: string[] = [];
-  if (blocks.snapshot > signed) problems.push('snapshot block is later than the signed timestamp');
-  if (blocks.afterMaxAge !== undefined && blocks.afterMaxAge < posted) {
-    problems.push(`snapshot block is more than ${MAX_SNAPSHOT_AGE_BLOCKS} blocks before the proposal was posted`);
-  }
-  return problems;
-};
 
 const blockTimestamp = async (client: PublicClient, blockNumber: bigint) => {
   const block = await client.getBlock({ blockNumber });
@@ -101,17 +77,13 @@ export const verifyProposal = async (
 
   if (votes.length !== proposal.votes) problems.push(`hub counts ${proposal.votes} votes but lists ${votes.length}`);
   if (proposal.scores_state !== 'final') problems.push(`hub scores are ${proposal.scores_state}, not final`);
-  const times = await fetchProposalTimes(proposalId);
-  // `created` is the receipt itself on a proposal the hub received since the change above
-  const receivedAfter = Math.max(times.receivedAfter, proposal.created);
-  problems.push(...timestampProblems(times.signed, receivedAfter));
+  // Since 2026-10-26 at the latest the hub sets `created` to when it received the proposal, moving `start` and `end`
+  // with it, whenever the signed timestamp is earlier. On an older proposal `created` is the signed timestamp, which
+  // the sequencer takes up to six days old, and the messages received right before it bound the receipt instead
+  const receivedAfter = Math.max(await fetchReceivedAfter(proposalId), proposal.created);
   const snapshotTimestamp = await blockTimestamp(client, proposal.snapshot);
-  problems.push(
-    ...snapshotAgeProblems(times.signed, receivedAfter, {
-      snapshot: snapshotTimestamp,
-      afterMaxAge: await blockTimestampIfMined(client, proposal.snapshot + MAX_SNAPSHOT_AGE_BLOCKS),
-    })
-  );
+  const afterMaxAge = await blockTimestampIfMined(client, proposal.snapshot + MAX_SNAPSHOT_AGE_BLOCKS);
+  problems.push(...snapshotAgeProblems(receivedAfter, afterMaxAge));
 
   // The proposer's power is read along with the voters', at the same block
   const voterAddresses = votes.map((vote) => vote.voter);

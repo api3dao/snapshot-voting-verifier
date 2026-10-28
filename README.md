@@ -14,8 +14,7 @@ What the hub has to show:
 
 What the proposal has to satisfy:
 
-- The snapshot block is not later than the signed timestamp and at most 7,200 blocks, about a day, before the proposal was posted, the later of the signed timestamp and the hub's receipt, section 4.1. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine.
-- The signed timestamp precedes the hub's receipt by at most a day, section 4.1. Snapshot accepts a timestamp up to six days old, and since 2026-10-26 at the latest the hub moves a proposal's `created`, `start` and `end` to its receipt when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal. The signed timestamp is read from the hub's message record. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal, and by `created` on a proposal received since that change.
+- The snapshot block is at most 7,200 blocks, about a day, before the hub received the proposal, section 4.1. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine, and a Safe that signs with it has a day to collect its signatures and deliver the proposal. Since 2026-10-26 at the latest the hub sets a proposal's `created` to its receipt, moving `start` and `end` with it, when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. On an older proposal `created` is the signed timestamp, and the receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
 
 What every vote has to satisfy:
 
