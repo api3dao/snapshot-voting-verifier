@@ -268,8 +268,8 @@ const main = async () => {
     setDelegate(chained, SPACE_ID, WALLETS.delegator.address),
   ];
 
-  // The fixture vesting was deployed once by the agent, a DelegatedVesting of the time with the test space id, with
-  // itself as owner and beneficiary, and is never deployed again, see VESTING in wallets.ts
+  // The fixture vesting was deployed once and is never deployed again, see VESTING in wallets.ts for what it is to
+  // the tests. Here it only has to exist and hold its amount
   if (!VESTING) throw new Error('The fixture vesting is not recorded');
   const vestingCode = await client.getCode({ address: VESTING });
   if (!vestingCode || vestingCode === '0x') throw new Error(`No code at the recorded vesting address ${VESTING}`);
