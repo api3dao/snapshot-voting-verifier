@@ -41,11 +41,11 @@ import {
 // skipped when already done, so the script can be rerun after a failure. Against a local fork it is a rehearsal,
 // against mainnet it needs --mainnet on top of the URL and every step is broadcast for real.
 
-// The fixture vesting is deployed, see VESTING in wallets.ts. Its source lives in API3's DAO migration repository,
-// the artifact is only needed to deploy it again, VESTING_ARTIFACT names it
+// The fixture vesting is deployed, see VESTING in wallets.ts. Its source is fixture/FixtureDelegatedVesting.sol in
+// API3's delegated-vesting repository, built there with `forge build fixture/FixtureDelegatedVesting.sol`. The
+// artifact is only needed to deploy it again, VESTING_ARTIFACT names it
 const VESTING_ARTIFACT_PATH =
-  process.env.VESTING_ARTIFACT ??
-  '../api3-dao-migration/delegated-vesting/out/FixtureDelegatedVesting.sol/FixtureDelegatedVesting.json';
+  process.env.VESTING_ARTIFACT ?? '../delegated-vesting/out/FixtureDelegatedVesting.sol/FixtureDelegatedVesting.json';
 
 const { values } = parseArgs({
   options: {
