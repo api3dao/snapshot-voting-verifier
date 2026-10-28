@@ -6,9 +6,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { AGENT, SPACE, VESTING, WALLETS } from '../fixture/wallets';
+import { fetchSpace } from '../src/hub';
 import { type VotingPower, computePowers } from '../src/power';
 import { createClient } from '../src/rpc';
 import { type Strategy, strategySchema, withDelegationParamsSchema } from '../src/schemas';
+import { PINNED_SETTINGS, fetchSettingsInForce, settingsDifferences } from '../src/settings';
 import { scoreOf, sumScores } from '../src/strategies';
 import { scoresMatch } from '../src/tally';
 
@@ -19,9 +21,9 @@ import { type Holdings, asFloat, morphoMarketIdOf, readHoldings, totalPower } fr
 // Kabu market, and the Vault Safe with its delegated pool shares. The recomputation has to match the raw reads and
 // what Snapshot's score API computes from the same file, at a recent block
 
-// The api3.eth settings as they will be signed, a copy of the file the space is created from. SETTINGS_PATH points
-// the test at another file
-const SETTINGS_PATH = process.env.SETTINGS_PATH ?? join(__dirname, 'api3-eth-settings.json');
+// The pinned api3.eth settings, the ones the space runs. SETTINGS_PATH points the test at another file, settings to
+// be signed for instance
+const SETTINGS_PATH = process.env.SETTINGS_PATH ?? join(__dirname, '../src/api3-eth-settings.json');
 const SCORE_API_URL = 'https://score.snapshot.org';
 // Reads at the block the settings file will be judged at are final after 64 blocks, see snapshot/security.md
 const BLOCKS_BEHIND_HEAD = 64n;
@@ -93,6 +95,22 @@ describe('the settings file', () => {
       'contract-call',
       'contract-call',
     ]);
+  });
+});
+
+describe('the api3.eth space on the hub', () => {
+  it('runs the pinned settings, the last settings message the hub received', async () => {
+    const inForce = await fetchSettingsInForce(PRODUCTION_SPACE);
+
+    expect(inForce).toBeDefined();
+    expect(settingsDifferences(PINNED_SETTINGS[PRODUCTION_SPACE]!, inForce!.settings)).toEqual([]);
+  });
+
+  it('serves the pinned network and strategies', async () => {
+    const space = await fetchSpace(PRODUCTION_SPACE);
+
+    expect(space.network).toBe(PINNED_SETTINGS[PRODUCTION_SPACE]!.network);
+    expect(space.strategies).toEqual(PINNED_SETTINGS[PRODUCTION_SPACE]!.strategies);
   });
 });
 
