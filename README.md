@@ -4,7 +4,7 @@ Recomputes the result of a Snapshot proposal from the chain and says whether the
 
 ## What it checks
 
-Section 4 of the DAO migration proposal is the specification. Every check below implements a sentence of it or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome, noted below.
+The governance rules of the DAO migration proposal are the specification. Every check below implements a sentence of that text or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome, noted below.
 
 What the hub has to show:
 
@@ -14,8 +14,7 @@ What the hub has to show:
 
 What the proposal has to satisfy:
 
-- The snapshot block is not later than the signed timestamp and at most 7,200 blocks, about a day, before the proposal was posted, the later of the signed timestamp and the hub's receipt, section 4.1. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine.
-- The signed timestamp precedes the hub's receipt by at most a day, section 4.1. Snapshot accepts a timestamp up to six days old, and since 2026-10-26 at the latest the hub moves a proposal's `created`, `start` and `end` to its receipt when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal. The signed timestamp is read from the hub's message record. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal, and by `created` on a proposal received since that change.
+- The snapshot block is at most 7,200 blocks, about a day, before the hub received the proposal. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine, and a Safe that signs with it has a day to collect its signatures and deliver the proposal. Since 2026-10-26 at the latest the hub sets a proposal's `created` to its receipt, moving `start` and `end` with it, when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. On an older proposal `created` is the signed timestamp, and the receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
 
 What every vote has to satisfy:
 
@@ -33,13 +32,13 @@ What the tally has to satisfy:
 The rules of `api3.eth`, printed next to the tally for the signers to tick and judged on the recomputed result:
 
 - The proposal is a basic one with the choices For, Against and Abstain.
-- The proposer held 500,000 API3 at the snapshot block, section 4.2. The sequencer checked the latest block when it received the proposal.
+- The proposer held 500,000 API3 at the snapshot block. The sequencer checked the latest block when it received the proposal.
 - Voting opened at the proposal's creation on the hub, no delay, and ran seven days.
 - The quorum set on the proposal is 10,000,000.
-- At least 10,000,000 was cast in favour, section 4.3. Snapshot's own quorum counts every vote, this one only the votes for, and an abstain cast through the API counts for nothing.
+- At least 10,000,000 was cast in favour. Snapshot's own quorum counts every vote, this one only the votes for, and an abstain cast through the API counts for nothing.
 - There are more votes for than against.
 
-A failed check among the first four rules means the proposal bypassed the space's settings and is a problem like any other. The last two only decide the outcome, which the report states in one line. The tool does not judge whether a proposal is a rule change under section 4.4 or date its 30 days, that is the signers' reading of the content.
+A failed check among the first four rules means the proposal bypassed the space's settings and is a problem like any other. The last two only decide the outcome, which the report states in one line. The tool does not judge whether a proposal is a rule change or date its 30 days, that is the signers' reading of the content.
 
 Supported: `basic` and `single-choice` proposals, and the strategies `with-delegation` over `erc20-balance-of`, `contract-call` and `math` (Snapshot's operations, in floats, as the score API computes them). Anything else fails loudly rather than being skipped.
 

@@ -81,11 +81,10 @@ export const fetchProposal = async (id: string) => {
 
 const messageSchema = z.strictObject({ mci: z.number().int(), timestamp: z.number().int() });
 
-// The hub numbers every message it receives (mci) and keeps the timestamp each one was signed with. The proposal's own
-// record gives its signed timestamp. The signed timestamps of the messages it received right before the proposal bound
-// when the proposal itself was received, whatever the proposal's own timestamp claims: each of them was signed no
-// later than it was received, and received before the proposal was
-export const fetchProposalTimes = async (proposalId: string) => {
+// The hub numbers every message it receives (mci). The signed timestamps of the messages it received right before a
+// proposal bound when the proposal itself was received, whatever the proposal's own timestamp claims: each of them
+// was signed no later than it was received, and received before the proposal was
+export const fetchReceivedAfter = async (proposalId: string) => {
   const own = await graphql(
     `
       query ($id: String!) {
@@ -114,7 +113,7 @@ export const fetchProposalTimes = async (proposalId: string) => {
   );
   const neighbours = z.array(messageSchema).parse(before.messages);
   if (neighbours.length === 0) throw new Error(`The hub has no messages before ${message.mci}`);
-  return { signed: message.timestamp, receivedAfter: Math.max(...neighbours.map((neighbour) => neighbour.timestamp)) };
+  return Math.max(...neighbours.map((neighbour) => neighbour.timestamp));
 };
 
 const VOTE_FIELDS = 'id ipfs voter choice vp vp_by_strategy vp_state created reason app metadata';

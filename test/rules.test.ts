@@ -20,7 +20,7 @@ const failed = (ruled: RuledProposal, scores: number[], authorPower = 600_000) =
   checkRules(api3, ruled, scores, AUTHOR, authorPower).checks.filter((check) => !check.ok);
 
 describe('the api3.eth rule set', () => {
-  it('holds the figures of section 4', () => {
+  it('holds the figures of the migration proposal', () => {
     expect(api3).toEqual({ quorum: 10_000_000, delay: 0, period: 604_800, minScore: 500_000 });
   });
 });

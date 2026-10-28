@@ -72,7 +72,7 @@ export const formatReport = (verification: Verification) => {
     `${proposal.space.id}: ${proposal.title}`,
     `Labels ${proposal.labels.length > 0 ? proposal.labels.join(', ') : 'none'}, proposed by ${proposal.author}`,
     `State ${proposal.state}, hub scores ${proposal.scores_state}, ${voters.length} votes`,
-    `Snapshot block ${proposal.snapshot} at ${formatDate(verification.snapshotTimestamp)}, proposal signed ${formatDate(proposal.created)}, received by the hub after ${formatDate(verification.receivedAfter)}`,
+    `Snapshot block ${proposal.snapshot} at ${formatDate(verification.snapshotTimestamp)}, proposal created ${formatDate(proposal.created)}, received by the hub after ${formatDate(verification.receivedAfter)}`,
     `Voting ${formatDate(proposal.start)} to ${formatDate(proposal.end)}`,
     '',
     ...voters.flatMap((voter) => [...formatVoter(voter, proposal.choices), '']),
