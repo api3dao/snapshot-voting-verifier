@@ -15,7 +15,7 @@ What the hub has to show:
 What the proposal has to satisfy:
 
 - The snapshot block is not later than the signed timestamp and at most 7,200 blocks, about a day, before the proposal was posted, the later of the signed timestamp and the hub's receipt, section 4.1. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine.
-- The signed timestamp precedes the hub's receipt by at most a day, or half the delay on a space with a delay shorter than two days. Snapshot accepts a timestamp up to six days old, which sets `start` and would shorten the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal, at the cost of up to a day of the seven. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
+- The signed timestamp precedes the hub's receipt by at most a day, section 4.1. Snapshot accepts a timestamp up to six days old, and since 2026-10-26 at the latest the hub moves a proposal's `created`, `start` and `end` to its receipt when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. A day leaves a Safe time to collect its signatures and deliver the proposal. The signed timestamp is read from the hub's message record. The receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal, and by `created` on a proposal received since that change.
 
 What every vote has to satisfy:
 
@@ -34,7 +34,7 @@ The rules of `api3.eth`, printed next to the tally for the signers to tick and j
 
 - The proposal is a basic one with the choices For, Against and Abstain.
 - The proposer held 500,000 API3 at the snapshot block, section 4.2. The sequencer checked the latest block when it received the proposal.
-- Voting opened at the signed timestamp, no delay, and ran seven days.
+- Voting opened at the proposal's creation on the hub, no delay, and ran seven days.
 - The quorum set on the proposal is 10,000,000.
 - At least 10,000,000 was cast in favour, section 4.3. Snapshot's own quorum counts every vote, this one only the votes for, and an abstain cast through the API counts for nothing.
 - There are more votes for than against.

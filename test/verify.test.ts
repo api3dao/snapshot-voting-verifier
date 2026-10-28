@@ -5,7 +5,6 @@ import {
   TIMESTAMP_TOLERANCE_SECONDS,
   snapshotAgeProblems,
   timestampProblems,
-  timestampTolerance,
 } from '../src/verify';
 
 const created = 1_792_500_000;
@@ -50,9 +49,9 @@ describe('snapshotAgeProblems', () => {
     expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(10_000_000n))).toEqual([tooOld]);
   });
 
-  it('rejects a block after the creation', () => {
+  it('rejects a block after the signed timestamp', () => {
     expect(snapshotAgeProblems(created, receivedAfter, neighbourhood(-5n))).toEqual([
-      'snapshot block is later than the proposal creation',
+      'snapshot block is later than the signed timestamp',
     ]);
   });
 
@@ -64,33 +63,19 @@ describe('snapshotAgeProblems', () => {
   });
 });
 
-describe('timestampTolerance', () => {
-  it('is a day on a space with a long delay and half the delay on a short one', () => {
-    expect(timestampTolerance(TWO_DAYS)).toBe(TIMESTAMP_TOLERANCE_SECONDS);
-    expect(timestampTolerance(60)).toBe(30);
-    expect(timestampTolerance(0)).toBe(TIMESTAMP_TOLERANCE_SECONDS);
-  });
-});
-
 describe('timestampProblems', () => {
-  it('accepts a proposal signed shortly before the hub received it', () => {
-    expect(timestampProblems(created, created + 30, TWO_DAYS)).toEqual([]);
-    expect(timestampProblems(created, created + TIMESTAMP_TOLERANCE_SECONDS, TWO_DAYS)).toEqual([]);
+  it('accepts a proposal signed up to a day before the hub received it', () => {
+    expect(timestampProblems(created, created + 30)).toEqual([]);
+    expect(timestampProblems(created, created + TIMESTAMP_TOLERANCE_SECONDS)).toEqual([]);
   });
 
   it('accepts a receipt bound before the signature, the neighbours were quiet', () => {
-    expect(timestampProblems(created, created - 500, TWO_DAYS)).toEqual([]);
+    expect(timestampProblems(created, created - 500)).toEqual([]);
   });
 
-  it('rejects a backdated signature, which skips the delay by that much', () => {
-    expect(timestampProblems(created - TWO_DAYS, created, TWO_DAYS)).toEqual([
-      `proposal timestamp is ${TWO_DAYS} seconds before the hub received it, the voting window is shifted back by that much`,
-    ]);
-  });
-
-  it('rejects twenty minutes of backdating on a space with a one minute delay', () => {
-    expect(timestampProblems(created - 1200, created, 60)).toEqual([
-      'proposal timestamp is 1200 seconds before the hub received it, the voting window is shifted back by that much',
+  it('rejects a signature more than a day before the receipt', () => {
+    expect(timestampProblems(created - TWO_DAYS, created)).toEqual([
+      `proposal was signed ${TWO_DAYS} seconds before the hub received it, more than a day`,
     ]);
   });
 });
