@@ -65,7 +65,7 @@ describe('checkRules', () => {
     const result = checkRules(api3, shifted, [12_000_000, 0, 0], AUTHOR, 600_000);
 
     expect(result.checks.filter((check) => !check.ok).map((check) => [check.text, check.bypass])).toEqual([
-      ['delay of 60 seconds between the signed timestamp and the start, 0 expected', true],
+      ['delay of 60 seconds between the creation and the start, 0 expected', true],
       ['voting period of 518400 seconds, 604800 expected', true],
       ['quorum of 1 set on the proposal, 10,000,000 expected', true],
     ]);

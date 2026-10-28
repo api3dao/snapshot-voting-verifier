@@ -5,7 +5,7 @@
 export interface RuleSet {
   // Votes in favour. Snapshot's own quorum counts every vote cast, this one does not
   quorum: number;
-  // Seconds from the signed timestamp to the start of voting, and the length of voting
+  // Seconds from the proposal's creation on the hub to the start of voting, and the length of voting
   delay: number;
   period: number;
   // Voting power the proposer needs at posting
@@ -55,9 +55,9 @@ const duration = (seconds: number) => {
 
 const delayText = (delay: number, expected: number) => {
   if (delay !== expected) {
-    return `delay of ${delay} seconds between the signed timestamp and the start, ${expected} expected`;
+    return `delay of ${delay} seconds between the creation and the start, ${expected} expected`;
   }
-  return expected === 0 ? 'no delay, voting opened at the signed timestamp' : `delay of ${duration(delay)}`;
+  return expected === 0 ? 'no delay, voting opened at the creation' : `delay of ${duration(delay)}`;
 };
 
 // `scores` are the recomputed totals per choice, `authorPower` the proposer's power at the snapshot block
