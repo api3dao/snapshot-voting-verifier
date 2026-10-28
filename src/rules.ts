@@ -1,4 +1,4 @@
-// The rules of the API3 DAO's governance (section 4 of the migration proposal, version 1.0) that Snapshot does not
+// The rules of the API3 DAO's governance, as the migration proposal sets them, that Snapshot does not
 // enforce, or enforces only through space settings the controller could change: the tool computes the list from the
 // recomputed result and the signers tick it before executing. Every figure here is the proposal's own, not the hub's
 

@@ -10,8 +10,8 @@ import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
 
 export const SUPPORTED_PROPOSAL_TYPES = ['basic', 'single-choice'];
 
-// The snapshot block may be no deeper than this before the hub received the proposal (section 4.1 of the migration
-// proposal). The author picks it and the sequencer only checks that the block exists, so without a ceiling a proposal
+// The snapshot block may be no deeper than this before the hub received the proposal, the rule of the migration
+// proposal. The author picks it and the sequencer only checks that the block exists, so without a ceiling a proposal
 // could count balances from years ago, tokens since sold and delegations since revoked included. About a day of
 // blocks, so a Safe that signs a proposal with the latest block has a day to collect the other signatures and deliver
 // it. There is no floor: snapshot.box picks the latest block, and a reorg in the first minutes cannot reach the
