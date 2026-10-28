@@ -1,5 +1,4 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { go } from '@api3/promise-utils';
@@ -11,7 +10,6 @@ import {
   createWalletClient,
   formatEther,
   http,
-  parseAbi,
 } from 'viem';
 import { type Account, privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
@@ -31,8 +29,6 @@ import {
   SPACE_ID,
   VESTING,
   VESTING_AMOUNT,
-  VESTING_DURATION_SECONDS,
-  VESTING_START_DELAY_SECONDS,
   WALLETS,
   fixtureAccount,
 } from './wallets';
@@ -40,12 +36,6 @@ import {
 // Puts the fixture wallets into the state the fixture test expects. Every step first checks the chain and is
 // skipped when already done, so the script can be rerun after a failure. Against a local fork it is a rehearsal,
 // against mainnet it needs --mainnet on top of the URL and every step is broadcast for real.
-
-// The fixture vesting is deployed, see VESTING in wallets.ts. Its source lives in API3's DAO migration repository,
-// the artifact is only needed to deploy it again, VESTING_ARTIFACT names it
-const VESTING_ARTIFACT_PATH =
-  process.env.VESTING_ARTIFACT ??
-  '../api3-dao-migration/delegated-vesting/out/FixtureDelegatedVesting.sol/FixtureDelegatedVesting.json';
 
 const { values } = parseArgs({
   options: {
@@ -119,10 +109,6 @@ const poolDelegateOf = async (user: Address) => {
 const maxFeePerGas = async () => {
   const fees = await client.estimateFeesPerGas();
   return fees.maxFeePerGas;
-};
-const blockTimestamp = async () => {
-  const block = await client.getBlock();
-  return block.timestamp;
 };
 
 // Everything the pool holds for the user, whichever of the three buckets it is in
@@ -222,30 +208,6 @@ const setDelegate = (account: Account, id: Hex, delegate: Address): Step => ({
   run: () => send(account, { address: REGISTRY, abi: registryAbi, functionName: 'setDelegate', args: [id, delegate] }),
 });
 
-const deployVesting = (): Step => ({
-  label: 'agent deploys the fixture vesting with itself as owner and beneficiary',
-  done: async () => {
-    if (!VESTING) return false;
-    const code = await client.getCode({ address: VESTING });
-    if (!code || code === '0x') throw new Error(`No code at the recorded vesting address ${VESTING}`);
-    return true;
-  },
-  run: async () => {
-    const artifact = JSON.parse(readFileSync(VESTING_ARTIFACT_PATH, 'utf8')) as {
-      abi: never;
-      bytecode: { object: Hex };
-    };
-    const start = (await blockTimestamp()) + VESTING_START_DELAY_SECONDS;
-    return walletOf(agent).deployContract({
-      abi: parseAbi([
-        'constructor(address owner_, address beneficiary_, uint256 startTimestamp_, uint256 durationSeconds_, uint256 amount_)',
-      ]),
-      bytecode: artifact.bytecode.object,
-      args: [agent.address, agent.address, start, VESTING_DURATION_SECONDS, VESTING_AMOUNT],
-    });
-  },
-});
-
 const main = async () => {
   const chainId = await client.getChainId();
   if (chainId !== 1) throw new Error(`RPC serves chain ${chainId}`);
@@ -264,7 +226,6 @@ const main = async () => {
 
   const kabuSupplied = async () => (await collateralOf(staker.address, KABU_MARKET_ID)) >= WALLETS.staker.kabu;
   const steps: Step[] = [
-    deployVesting(),
     ...Object.values(WALLETS).map((wallet) => fundEth(wallet.address, wallet.gasBudget)),
     transferApi3(WALLETS.staker.address, WALLETS.staker.liquid + WALLETS.staker.deposit + WALLETS.staker.morpho),
     transferApi3(WALLETS.delegator.address, WALLETS.delegator.liquid + WALLETS.delegator.deposit),
@@ -307,7 +268,11 @@ const main = async () => {
     setDelegate(chained, SPACE_ID, WALLETS.delegator.address),
   ];
 
-  let vesting: Address | null = VESTING;
+  // The fixture vesting was deployed once and is never deployed again, see VESTING in wallets.ts for what it is to
+  // the tests. Here it only has to exist and hold its amount
+  if (!VESTING) throw new Error('The fixture vesting is not recorded');
+  const vestingCode = await client.getCode({ address: VESTING });
+  if (!vestingCode || vestingCode === '0x') throw new Error(`No code at the recorded vesting address ${VESTING}`);
   for (const step of steps) {
     // Public endpoints rate-limit bursts, so a step is retried as a whole and re-checks the chain before resending
     const outcome = await go(
@@ -327,18 +292,9 @@ const main = async () => {
     }
     const { hash, receipt } = outcome.data;
     console.log(`done  ${step.label} (${hash}, ${receipt.gasUsed} gas)`);
-    if (receipt.contractAddress) {
-      vesting = receipt.contractAddress.toLowerCase() as Address;
-      console.log(`      vesting deployed at ${vesting}, record it in fixture/wallets.ts`);
-      const fund = transferApi3(vesting, VESTING_AMOUNT);
-      const fundHash = await fund.run();
-      const fundReceipt = await client.waitForTransactionReceipt({ hash: fundHash });
-      if (fundReceipt.status !== 'success') throw new Error(`${fund.label} reverted in ${fundHash}`);
-      console.log(`done  ${fund.label} (${fundHash}, ${fundReceipt.gasUsed} gas)`);
-    }
   }
-  if (vesting && (await balance(API3, vesting)) < VESTING_AMOUNT) {
-    const fund = transferApi3(vesting, VESTING_AMOUNT);
+  if ((await balance(API3, VESTING)) < VESTING_AMOUNT) {
+    const fund = transferApi3(VESTING, VESTING_AMOUNT);
     const hash = await fund.run();
     await client.waitForTransactionReceipt({ hash });
     console.log(`done  ${fund.label} (${hash})`);
@@ -350,11 +306,9 @@ const main = async () => {
       `${name} ${wallet.address}: liquid ${await balance(API3, wallet.address)}, deposited ${await depositedOf(wallet.address)}, staked ${await poolStake(wallet.address)}, unstaking ${await unstakeAmountOf(wallet.address)}, morpho ${await collateralOf(wallet.address)}, kabu ${await collateralOf(wallet.address, KABU_MARKET_ID)}, delegation space ${await delegation(wallet.address, SPACE_ID)} global ${await delegation(wallet.address, GLOBAL_ID)}, eth ${formatEther(await client.getBalance({ address: wallet.address }))}`
     );
   }
-  if (vesting) {
-    console.log(
-      `vesting ${vesting}: liquid ${await balance(API3, vesting)}, delegation space ${await delegation(vesting, SPACE_ID)}`
-    );
-  }
+  console.log(
+    `vesting ${VESTING}: liquid ${await balance(API3, VESTING)}, delegation space ${await delegation(VESTING, SPACE_ID)}`
+  );
   console.log(
     `agent ${agent.address}: liquid ${await balance(API3, agent.address)}, ${formatEther(await client.getBalance({ address: agent.address }))} ETH`
   );

@@ -37,7 +37,12 @@ export const KABU_MARKET = {
 };
 export const KABU_MARKET_ID: Hex = '0x70dfbd2705d10d5dfb4d89e07e2bb860b5a624ce2f97e209ab9f5308bf6c67a1';
 
-// Filled in after the mainnet deployment
+// Filled in after the mainnet deployment.
+// VESTING is a DelegatedVesting of October 2026 with the test space id, deployed once by the agent with itself as owner
+// and beneficiary, and never deployed again. To the tests it is only a contract that holds VESTING_AMOUNT of API3 and
+// delegated the space to the agent in the registry, the one contract holder among the fixture wallets: the strategies
+// read its balance and follow its delegation as they would for a Safe, nothing reads vesting state. So the tests do not
+// depend on the DelegatedVesting implementation, a new version changes nothing here, and the contract stays as it is.
 export const VESTING: Address | null = '0x9e4be3511798df134349bcfe54c270cc7330fb3a';
 export const PROPOSAL_ID: string | null = '0x29b6b33ee2cfac8521f0d24bcf54377cd08e5f4b1bc0529b60ad9da7070fbd87';
 
