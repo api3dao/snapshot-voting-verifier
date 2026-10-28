@@ -2,9 +2,19 @@ import { go } from '@api3/promise-utils';
 import { BlockNotFoundError, type PublicClient } from 'viem';
 
 import { archiveVotes } from './archive';
-import { type HubProposal, type HubVote, fetchProposal, fetchReceivedAfter, fetchVotes } from './hub';
+import {
+  type HubProposal,
+  type HubSettingsMessage,
+  type HubVote,
+  fetchMessageMci,
+  fetchProposal,
+  fetchReceivedAfter,
+  fetchSettingsAfter,
+  fetchVotes,
+} from './hub';
 import { type StrategyPower, computePowers } from './power';
 import { RULE_SETS, type RulesResult, checkRules } from './rules';
+import { PINNED_SETTINGS, fetchSettingsInForce, settingsProblems } from './settings';
 import { verifyVoteSignature } from './signature';
 import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
 
@@ -58,6 +68,9 @@ export type Verification = {
   authorPower: number;
   // The space's rules checked on the recomputed result, null for a space without a known rule set
   rules: RulesResult | null;
+  // The settings message in force when the hub received the proposal, for a space with pinned settings, undefined if
+  // the hub has none, null for a space without pinned settings
+  settingsInForce: HubSettingsMessage | undefined | null;
   problems: string[];
 };
 
@@ -80,10 +93,23 @@ export const verifyProposal = async (
   // Since 2026-10-26 at the latest the hub sets `created` to when it received the proposal, moving `start` and `end`
   // with it, whenever the signed timestamp is earlier. On an older proposal `created` is the signed timestamp, which
   // the sequencer takes up to six days old, and the messages received right before it bound the receipt instead
-  const receivedAfter = Math.max(await fetchReceivedAfter(proposalId), proposal.created);
+  const mci = await fetchMessageMci(proposalId);
+  const receivedAfter = Math.max(await fetchReceivedAfter(mci), proposal.created);
   const snapshotTimestamp = await blockTimestamp(client, proposal.snapshot);
   const afterMaxAge = await blockTimestampIfMined(client, proposal.snapshot + MAX_SNAPSHOT_AGE_BLOCKS);
   problems.push(...snapshotAgeProblems(receivedAfter, afterMaxAge));
+
+  // The settings the space ran when the hub received the proposal, and any change the hub may have received before
+  // the vote closed: a message signed after the close was received after it too
+  const pinned = PINNED_SETTINGS[proposal.space.id];
+  let settingsInForce: Verification['settingsInForce'] = null;
+  if (pinned) {
+    const inForce = await fetchSettingsInForce(proposal.space.id, mci);
+    settingsInForce = inForce?.message;
+    const after = await fetchSettingsAfter(proposal.space.id, mci);
+    const changes = after.filter((message) => message.timestamp <= proposal.end);
+    problems.push(...settingsProblems(pinned, proposal, inForce?.settings, changes));
+  }
 
   // The proposer's power is read along with the voters', at the same block
   const voterAddresses = votes.map((vote) => vote.voter);
@@ -154,6 +180,7 @@ export const verifyProposal = async (
     scores,
     authorPower,
     rules,
+    settingsInForce,
     problems,
   };
 };

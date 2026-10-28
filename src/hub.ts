@@ -27,6 +27,9 @@ const proposalSchema = z.strictObject({
   scores_total: z.number(),
   scores_state: z.string(),
   quorum: z.number(),
+  privacy: z.string(),
+  // The space's vote validation, copied onto the proposal when the hub received it
+  validation: z.strictObject({ name: z.string(), params: z.record(z.string(), z.unknown()).nullish() }),
   strategies: z.array(strategySchema),
 });
 
@@ -71,7 +74,8 @@ const graphql = async (query: string, variables: Record<string, unknown>) => {
 };
 
 const PROPOSAL_FIELDS = `id ipfs space { id } network type state title author labels choices start end snapshot created votes
-  scores scores_by_strategy scores_total scores_state quorum strategies { name network params }`;
+  scores scores_by_strategy scores_total scores_state quorum privacy validation { name params }
+  strategies { name network params }`;
 
 export const fetchProposal = async (id: string) => {
   const data = await graphql(`query ($id: String!) { proposal(id: $id) { ${PROPOSAL_FIELDS} } }`, { id });
@@ -81,11 +85,9 @@ export const fetchProposal = async (id: string) => {
 
 const messageSchema = z.strictObject({ mci: z.number().int(), timestamp: z.number().int() });
 
-// The hub numbers every message it receives (mci). The signed timestamps of the messages it received right before a
-// proposal bound when the proposal itself was received, whatever the proposal's own timestamp claims: each of them
-// was signed no later than it was received, and received before the proposal was
-export const fetchReceivedAfter = async (proposalId: string) => {
-  const own = await graphql(
+// The hub numbers every message it receives (mci), so the order of the numbers is the order it received them in
+export const fetchMessageMci = async (id: string) => {
+  const data = await graphql(
     `
       query ($id: String!) {
         messages(where: { id: $id }) {
@@ -95,11 +97,18 @@ export const fetchReceivedAfter = async (proposalId: string) => {
       }
     `,
     {
-      id: proposalId,
+      id,
     }
   );
-  const [message] = z.array(messageSchema).parse(own.messages);
-  if (!message) throw new Error(`The hub has no message for proposal ${proposalId}`);
+  const [message] = z.array(messageSchema).parse(data.messages);
+  if (!message) throw new Error(`The hub has no message ${id}`);
+  return message.mci;
+};
+
+// The signed timestamps of the messages the hub received right before a proposal bound when the proposal itself was
+// received, whatever the proposal's own timestamp claims: each of them was signed no later than it was received, and
+// received before the proposal was
+export const fetchReceivedAfter = async (mci: number) => {
   const before = await graphql(
     `
       query ($mci: Int!) {
@@ -109,11 +118,66 @@ export const fetchReceivedAfter = async (proposalId: string) => {
         }
       }
     `,
-    { mci: message.mci }
+    { mci }
   );
   const neighbours = z.array(messageSchema).parse(before.messages);
-  if (neighbours.length === 0) throw new Error(`The hub has no messages before ${message.mci}`);
+  if (neighbours.length === 0) throw new Error(`The hub has no messages before ${mci}`);
   return Math.max(...neighbours.map((neighbour) => neighbour.timestamp));
+};
+
+const settingsMessageSchema = z.strictObject({
+  id: z.string(),
+  mci: z.number().int(),
+  timestamp: z.number().int(),
+  ipfs: z.string(),
+});
+
+export type HubSettingsMessage = z.infer<typeof settingsMessageSchema>;
+
+// The settings message of a space the hub received last before the message numbered `mci`, or the latest one
+export const fetchSettingsBefore = async (space: string, mci?: number) => {
+  const data = await graphql(
+    `
+      query ($space: String!${mci === undefined ? '' : ', $mci: Int!'}) {
+        messages(
+          first: 1
+          where: { space: $space, type: "settings"${mci === undefined ? '' : ', mci_lt: $mci'} }
+          orderBy: "mci"
+          orderDirection: desc
+        ) {
+          id
+          mci
+          timestamp
+          ipfs
+        }
+      }
+    `,
+    mci === undefined ? { space } : { space, mci }
+  );
+  return z.array(settingsMessageSchema).parse(data.messages)[0];
+};
+
+// Every settings message of a space the hub received after the message numbered `mci`, in the order it received them
+export const fetchSettingsAfter = async (space: string, mci: number) => {
+  const data = await graphql(
+    `
+      query ($space: String!, $mci: Int!) {
+        messages(
+          first: 1000
+          where: { space: $space, type: "settings", mci_gt: $mci }
+          orderBy: "mci"
+          orderDirection: asc
+        ) {
+          id
+          mci
+          timestamp
+          ipfs
+        }
+      }
+    `,
+    { space, mci }
+  );
+  return z.array(settingsMessageSchema).parse(data.messages);
 };
 
 const VOTE_FIELDS = 'id ipfs voter choice vp vp_by_strategy vp_state created reason app metadata';

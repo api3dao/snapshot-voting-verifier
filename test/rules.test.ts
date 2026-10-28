@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { RULE_SETS, type RuledProposal, checkRules } from '../src/rules';
+import { PINNED_SETTINGS } from '../src/settings';
 
 const api3 = RULE_SETS['api3.eth']!;
 const AUTHOR = '0x8e03609ed680b237c7b6f8020472ca0687308b24';
@@ -22,6 +23,20 @@ const failed = (ruled: RuledProposal, scores: number[], authorPower = 600_000) =
 describe('the api3.eth rule set', () => {
   it('holds the figures of the migration proposal', () => {
     expect(api3).toEqual({ quorum: 10_000_000, delay: 0, period: 604_800, minScore: 500_000 });
+  });
+
+  it('holds the figures the pinned space settings carry', () => {
+    const { voting, validation } = PINNED_SETTINGS['api3.eth']! as unknown as {
+      voting: { quorum: number; delay: number; period: number };
+      validation: { params: { minScore: number } };
+    };
+
+    expect(api3).toEqual({
+      quorum: voting.quorum,
+      delay: voting.delay,
+      period: voting.period,
+      minScore: validation.params.minScore,
+    });
   });
 });
 

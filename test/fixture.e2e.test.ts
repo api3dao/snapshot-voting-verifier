@@ -16,10 +16,11 @@ import {
   VESTING_AMOUNT,
   WALLETS,
 } from '../fixture/wallets';
-import { fetchProposal, fetchSpace } from '../src/hub';
+import { fetchMessageMci, fetchProposal, fetchSettingsAfter, fetchSpace } from '../src/hub';
 import { type VotingPower, computePowers } from '../src/power';
 import { createClient } from '../src/rpc';
 import { type Strategy } from '../src/schemas';
+import { fetchSettingsInForce, settingsProblems } from '../src/settings';
 import { sumScores } from '../src/strategies';
 import { scoresMatch } from '../src/tally';
 import { verifyProposal } from '../src/verify';
@@ -226,5 +227,28 @@ describe('hub agreement on the fixture proposal', () => {
       `rule bypassed: quorum of ${(1e25).toLocaleString('en-US')} set on the proposal, 300 expected`,
     ]);
     expect(verification.rules?.outcome).toBe('not to be executed, a rule was bypassed');
+    // The sandbox has no pinned settings
+    expect(verification.settingsInForce).toBeNull();
+  });
+});
+
+// The sandbox has no pinned settings, so the settings it ran when the fixture proposal was posted stand in for them:
+// the lookup by the proposal's place in the hub's message order, the signed object behind it and the comparison with
+// what the hub copied onto the proposal, all on real hub data
+describe('the settings in force when the hub received the fixture proposal', () => {
+  it('carry the strategies, network, privacy and vote validation the hub copied onto the proposal', async () => {
+    const proposal = await fetchProposal(proposalId);
+    const inForce = await fetchSettingsInForce(SPACE, await fetchMessageMci(proposalId));
+
+    expect(inForce).toBeDefined();
+    expect(settingsProblems(inForce!.settings, proposal, inForce!.settings, [])).toEqual([]);
+  });
+
+  it('are followed by the settings the sandbox was re-signed with for the rehearsals, in the order received', async () => {
+    const mci = await fetchMessageMci(proposalId);
+    const after = await fetchSettingsAfter(SPACE, mci);
+
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((message, index) => message.mci > (after[index - 1]?.mci ?? mci))).toBe(true);
   });
 });

@@ -65,6 +65,13 @@ const formatRules = (verification: Verification) => {
   ];
 };
 
+// The settings message the space ran under, compared with the pinned settings in the verdict's problems
+const formatSettings = ({ proposal, settingsInForce }: Verification) => {
+  if (settingsInForce === null) return `No pinned settings for ${proposal.space.id}`;
+  if (settingsInForce === undefined) return `Settings of ${proposal.space.id}: the hub has none before the proposal`;
+  return `Settings of ${proposal.space.id} at posting: message ${settingsInForce.id} signed ${formatDate(settingsInForce.timestamp)}, compared with the pinned ones`;
+};
+
 export const formatReport = (verification: Verification) => {
   const { proposal, voters, scores, archiveDiff } = verification;
   const lines = [
@@ -83,6 +90,7 @@ export const formatReport = (verification: Verification) => {
     ),
     '',
     ...formatRules(verification),
+    formatSettings(verification),
     '',
     `Votes archived to ${verification.archiveFile}`,
     ...(archiveDiff ? formatArchiveDiff(archiveDiff) : []),

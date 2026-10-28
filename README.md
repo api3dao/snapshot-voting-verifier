@@ -16,6 +16,14 @@ What the proposal has to satisfy:
 
 - The snapshot block is at most 7,200 blocks, about a day, before the hub received the proposal. The author picks the block and Snapshot only checks that it exists, so without the ceiling a proposer could count balances from years ago. Snapshot's own default, the latest block, is fine, and a Safe that signs with it has a day to collect its signatures and deliver the proposal. Since 2026-10-26 at the latest the hub sets a proposal's `created` to its receipt, moving `start` and `end` with it, when the signed timestamp is earlier, so a backdated signature no longer shortens the voting window. On an older proposal `created` is the signed timestamp, and the receipt is bounded by the signed timestamps of the messages the hub numbered right before the proposal.
 
+What the space has to run, for `api3.eth`, whose settings are pinned in `src/api3-eth-settings.json`, a copy of the settings the Vault Safe signed:
+
+- The settings message in force when the hub received the proposal, fetched by the CID the hub lists with the CID recomputed, equals the pinned settings in every field that decides who may post and vote, with what power, how the result is counted and who can change or moderate the space: the network, the strategies, voting, validation, vote validation, filters, admins, moderators and members. How the space presents itself, its name, description, avatar, links, categories and treasuries, is left out.
+- What Snapshot copied onto the proposal when it received it is the pinned network, strategies, privacy and vote validation.
+- The hub received no settings message while voting was open, judged by the signed timestamps: a message signed after the close was received after it too.
+
+The hub's message log is taken as it is, like its list of votes, since the sequencer only accepts a settings message from the space's controller, the Vault Safe that owns the ENS name. A space without pinned settings, the sandbox included, skips these checks and the report says so.
+
 What every vote has to satisfy:
 
 - Its pinned object is fetched by the CID the hub lists and the CID is recomputed from the content.
@@ -66,7 +74,7 @@ pnpm run power --space api3.eth --address 0x<holder> --block 25000000
 - `pnpm exec ts-node --transpileOnly fixture/setup.ts --rpc-url <url> --mainnet` is how the state was put in place: it funds the wallets and the vesting and sets every source and delegation. Each step is skipped when the chain already shows it, so rerunning it is harmless. Against a local `anvil --fork-url` it is a dry run. The vesting was deployed once, a DelegatedVesting of the time with the test space id, and is never deployed again.
 - `pnpm exec ts-node --transpileOnly fixture/proposal.ts --rpc-url <url> --create` published the proposal from the agent wallet and `--vote <id>` cast the two votes, both gasless signatures sent to the sequencer.
 
-`test/api3-eth-settings.json` is a copy of the settings the `api3.eth` space is created from. `test/production.e2e.test.ts` runs its strategies at a recent block over the fixture wallets, the Vault Safe with its delegated pool stake, a holder with Kabu market collateral and the Treasury and Agent Safes delegated to the dead address, and checks every source against the raw reads and every wallet against the score API.
+`test/production.e2e.test.ts` checks that the `api3.eth` space on the hub runs the pinned settings, runs their strategies at a recent block over the fixture wallets, the Vault Safe with its delegated pool stake, a holder with Kabu market collateral and the Treasury and Agent Safes delegated to the dead address, and checks every source against the raw reads and every wallet against the score API.
 
 ## Development checks
 
