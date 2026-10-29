@@ -28,6 +28,6 @@
   "dependencies": {
     "@api3/promise-utils": "^0.4.0",
     "viem": "^2.44.0",
-    "zod": "^4.3.0"
+    "zod": "^4.6.6"
   }
 }
