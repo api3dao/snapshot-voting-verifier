@@ -27,13 +27,14 @@ describe('the api3.eth rule set', () => {
 
   it('holds the figures the pinned space settings carry', () => {
     const { voting, validation } = PINNED_SETTINGS['api3.eth']! as unknown as {
-      voting: { quorum: number; delay: number; period: number };
+      voting: { quorum: number; delay?: number; period: number };
       validation: { params: { minScore: number } };
     };
 
     expect(api3).toEqual({
       quorum: voting.quorum,
-      delay: voting.delay,
+      // snapshot.box leaves a zero delay out, the sequencer checks the delay only when it is set
+      delay: voting.delay ?? 0,
       period: voting.period,
       minScore: validation.params.minScore,
     });
