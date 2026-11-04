@@ -25,7 +25,8 @@ import { type Holdings, asFloat, morphoMarketIdOf, readHoldings, totalPower } fr
 // be signed for instance
 const SETTINGS_PATH = process.env.SETTINGS_PATH ?? join(__dirname, '../src/api3-eth-settings.json');
 const SCORE_API_URL = 'https://score.snapshot.org';
-// Reads at the block the settings file will be judged at are final after 64 blocks, see snapshot/security.md
+// Reads at the block the settings file will be judged at are final after 64 blocks, the two epochs Ethereum takes to
+// finalize a block
 const BLOCKS_BEHIND_HEAD = 64n;
 
 const VAULT: Address = '0x8e03609ed680b237c7b6f8020472ca0687308b24';
