@@ -19,9 +19,9 @@ export type SpaceSettings = z.infer<typeof settingsSchema>;
 
 export const parseSettings = (json: string) => settingsSchema.parse(JSON.parse(json));
 
-// The settings the space has to run, as its controller signed them. api3-eth-settings.json is a copy of the file the
-// Vault Safe signed for api3.eth, a change to the space's settings is a change of the rules and lands here too. The
-// sandbox has no pinned settings, they were re-signed throughout the rehearsals
+// The settings the space has to run, as its controller signed them. api3-eth-settings.json is a copy of the settings
+// the Vault Safe last signed for api3.eth, a change to the space's settings is a change of the rules and lands here
+// too. The sandbox has no pinned settings, they were re-signed throughout the rehearsals
 export const PINNED_SETTINGS: Record<string, SpaceSettings> = {
   'api3.eth': parseSettings(readFileSync(join(__dirname, 'api3-eth-settings.json'), 'utf8')),
 };
