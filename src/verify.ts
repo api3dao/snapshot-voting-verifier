@@ -84,7 +84,7 @@ export const verifyProposal = async (
   if (!SUPPORTED_PROPOSAL_TYPES.includes(proposal.type)) {
     throw new Error(`Proposal type ${proposal.type} is not supported`);
   }
-  const votes = await fetchVotes(proposalId);
+  const votes = await fetchVotes(proposalId, proposal.space.id);
   const archive = archiveVotes(archiveDir, proposalId, votes, now);
   const problems: string[] = [];
 
