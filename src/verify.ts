@@ -13,7 +13,7 @@ import {
   fetchVotes,
 } from './hub';
 import { type StrategyPower, computePowers } from './power';
-import { RULE_SETS, type RulesResult, checkRules } from './rules';
+import { RULE_SETS, type RuleSet, type RuledProposal, type RulesResult, checkRules } from './rules';
 import { PINNED_SETTINGS, fetchSettingsInForce, settingsProblems } from './settings';
 import { verifyVoteSignature } from './signature';
 import { parseBasicChoice, scoresMatch, tallyBasic } from './tally';
@@ -79,6 +79,30 @@ export type Verification = {
   // the hub has none, null for a space without pinned settings
   settingsInForce: HubSettingsMessage | undefined | null;
   problems: string[];
+};
+
+// Votes with problems stay in the tally and hold the proposal back only if the outcome changes with their power, the
+// larger of the hub's and the recomputed one, cast For or Against instead, and in a space without a rule set always
+export const problemVotesProblems = (
+  ruleSet: RuleSet | undefined,
+  proposal: RuledProposal & Pick<HubProposal, 'author'>,
+  voters: VoterResult[],
+  authorPower: number
+) => {
+  const withProblems = voters.filter((voter) => voter.problems.length > 0);
+  if (withProblems.length === 0) return [];
+  if (!ruleSet) return ['votes with problems, and no rule set to judge the outcome by'];
+  let power = 0;
+  for (const voter of withProblems) power += Math.max(voter.vote.vp, voter.score);
+  const others = tallyBasic(
+    voters.filter((voter) => voter.problems.length === 0),
+    proposal.choices.length
+  );
+  const passedWith = (choice: number) => {
+    const scores = others.map((score, index) => (index === choice - 1 ? score + power : score));
+    return checkRules(ruleSet, proposal, scores, proposal.author, authorPower).passed;
+  };
+  return passedWith(1) === passedWith(2) ? [] : [`votes with problems hold ${power}, enough to change the outcome`];
 };
 
 export const verifyProposal = async (
@@ -165,9 +189,14 @@ export const verifyProposal = async (
   }
 
   const scores = tallyBasic(voters, proposal.choices.length);
+  // A vote with problems counts at the hub's power here, problemVotesProblems weighs the difference
+  const compared = tallyBasic(
+    voters.map((voter) => ({ choice: voter.choice, score: voter.problems.length > 0 ? voter.vote.vp : voter.score })),
+    proposal.choices.length
+  );
   for (const [index, hubScore] of proposal.scores.entries()) {
-    if (!scoresMatch(hubScore, scores[index]!)) {
-      problems.push(`hub score ${hubScore} for choice ${index + 1} differs from recomputed ${scores[index]}`);
+    if (!scoresMatch(hubScore, compared[index]!)) {
+      problems.push(`hub score ${hubScore} for choice ${index + 1} differs from recomputed ${compared[index]}`);
     }
   }
 
@@ -176,6 +205,7 @@ export const verifyProposal = async (
   for (const check of rules?.checks ?? []) {
     if (!check.ok && check.bypass) problems.push(`rule bypassed: ${check.text}`);
   }
+  problems.push(...problemVotesProblems(ruleSet, proposal, voters, authorPower));
 
   return {
     proposal,

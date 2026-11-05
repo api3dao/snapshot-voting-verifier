@@ -7,8 +7,17 @@ import { mainnet } from 'viem/chains';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { cidOf } from '../src/cid';
+import { formatReport } from '../src/report';
+import { RULE_SETS } from '../src/rules';
 import { scoreOf } from '../src/strategies';
-import { MAX_SNAPSHOT_AGE_BLOCKS, snapshotAgeProblems, verifyProposal } from '../src/verify';
+import {
+  MAX_SNAPSHOT_AGE_BLOCKS,
+  type Verification,
+  type VoterResult,
+  problemVotesProblems,
+  snapshotAgeProblems,
+  verifyProposal,
+} from '../src/verify';
 
 const received = 1_792_500_000;
 const SLOT = 12;
@@ -241,8 +250,74 @@ const verifyWith = async (
   return verifyProposal(client, PROPOSAL_ID, mkdtempSync(join(tmpdir(), 'vote-verification-')), new Date());
 };
 
+// The verdict the report ends with, above the problems it lists
+const verdictOf = (verification: Verification) =>
+  formatReport(verification)
+    .split('\n')
+    .find((line) => line.startsWith('VERIFIED: ') || line.startsWith('NOT VERIFIED: '));
+
 describe('verifyProposal', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('accepts a dust vote whose signature fails next to 50,000,000 in favour', async () => {
+    const verification = await verifyWith(
+      [castVote(alice, 1, tokens(50_000_000)), castVote(bob, 2, 1n, { created: start + 120 })],
+      { verifyTypedData: validSignaturesExcept(bob) }
+    );
+
+    expect(verification.voters.map((voter) => voter.problems)).toEqual([[], ['signature is not valid for the voter']]);
+    expect(verdictOf(verification)).toBe(
+      'VERIFIED: the outcome holds with the 1 votes with problems cast For or Against'
+    );
+  });
+
+  it('accepts a dust vote to abstain whose hub power differs from the recomputed one', async () => {
+    const dust = castVote(bob, 3, 1n, { created: start + 120 });
+    // The hub credits the voter a delegated wei that the registry's log order credits to another delegate
+    const verification = await verifyWith([
+      castVote(alice, 1, tokens(50_000_000)),
+      { ...dust, row: { ...dust.row, vp: 2e-18, vp_by_strategy: [2e-18] } },
+    ]);
+
+    expect(verification.voters.map((voter) => voter.problems)).toEqual([
+      [],
+      ['hub power 2e-18 differs from recomputed 1e-18', 'strategy 0 hub power 2e-18 differs from recomputed 1e-18'],
+    ]);
+    expect(verdictOf(verification)).toBe(
+      'VERIFIED: the outcome holds with the 1 votes with problems cast For or Against'
+    );
+  });
+
+  it('accepts a vote with problems that leaves the quorum in favour reached whichever way it is cast', async () => {
+    const verification = await verifyWith(
+      [castVote(alice, 1, tokens(300)), castVote(bob, 1, tokens(1), { created: start + 120 })],
+      { verifyTypedData: validSignaturesExcept(bob) }
+    );
+
+    expect(verdictOf(verification)).toBe(
+      'VERIFIED: the outcome holds with the 1 votes with problems cast For or Against'
+    );
+  });
+
+  it('rejects a vote with problems that holds what the quorum in favour lacks', async () => {
+    const verification = await verifyWith(
+      [castVote(alice, 1, tokens(299)), castVote(bob, 1, tokens(1), { created: start + 120 })],
+      { verifyTypedData: validSignaturesExcept(bob) }
+    );
+
+    expect(verdictOf(verification)).toMatch(/^NOT VERIFIED: /);
+  });
+
+  it('rejects a dust vote with problems in a space without a rule set', async () => {
+    const space = 'dorg.eth';
+    const verification = await verifyWith(
+      [castVote(alice, 1, tokens(50_000_000), { space }), castVote(bob, 2, 1n, { created: start + 120, space })],
+      { space, verifyTypedData: validSignaturesExcept(bob) }
+    );
+
+    expect(verification.rules).toBeNull();
+    expect(verdictOf(verification)).toMatch(/^NOT VERIFIED: /);
+  });
 
   it("reports a signature ending in an empty ERC-8010 suffix, which viem throws on, as the vote's problem", async () => {
     const sig = `0x${'00'.repeat(64)}${'8010'.repeat(16)}`;
@@ -317,5 +392,35 @@ describe('verifyProposal', () => {
 
     expect(verification.voters.map((voter) => voter.vote.id)).toEqual(idsInOrder(votes));
     expect(verification.problems).toEqual([]);
+  });
+});
+
+// The sandbox proposal as its rules see it, and a vote as the tally weighs it
+const ruled = {
+  type: 'basic',
+  created: received,
+  start,
+  end,
+  quorum: 300,
+  choices: ['For', 'Against', 'Abstain'],
+  author: AUTHOR,
+};
+const voterResult = (choice: number, score: number, problems: string[] = [], vp = score) =>
+  ({ vote: { vp }, choice, score, problems }) as VoterResult;
+const invalid = ['signature is not valid for the voter'];
+
+describe('problemVotesProblems', () => {
+  it('accepts a vote with problems that leaves more for than against whichever way it is cast', () => {
+    const voters = [voterResult(1, 1200), voterResult(2, 1100), voterResult(3, 99, invalid)];
+
+    expect(problemVotesProblems(RULE_SETS[SANDBOX], ruled, voters, 10)).toEqual([]);
+  });
+
+  it('rejects a vote with problems whose hub power, larger than the recomputed one, would tie for and against', () => {
+    const voters = [voterResult(1, 1200), voterResult(2, 1100), voterResult(3, 50, invalid, 100)];
+
+    expect(problemVotesProblems(RULE_SETS[SANDBOX], ruled, voters, 10)).toEqual([
+      'votes with problems hold 100, enough to change the outcome',
+    ]);
   });
 });

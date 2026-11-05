@@ -15,7 +15,7 @@ const main = async () => {
   const client = await createClient(1);
   const verification = await verifyProposal(client, values.proposal, values['archive-dir'], new Date());
   console.log(formatReport(verification));
-  const failed = verification.problems.length > 0 || verification.voters.some((voter) => voter.problems.length);
+  const failed = verification.problems.length > 0;
   process.exitCode = failed ? 1 : 0;
 };
 

@@ -49,6 +49,11 @@ const formatVerdict = (verification: Verification) => {
   if (verification.problems.length === 0 && votersWithProblems.length === 0) {
     return ['VERIFIED: every vote and the result match the recomputation'];
   }
+  if (verification.problems.length === 0) {
+    return [
+      `VERIFIED: the outcome holds with the ${votersWithProblems.length} votes with problems cast For or Against`,
+    ];
+  }
   return [
     `NOT VERIFIED: ${verification.problems.length} proposal problems, ${votersWithProblems.length} votes with problems`,
     ...verification.problems.map((problem) => `  ! ${problem}`),

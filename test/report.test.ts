@@ -120,4 +120,13 @@ describe('formatReport', () => {
     expect(lines).toContain(`ok ${VOTER} voted "For" with 600,000 (hub 600,000)`);
     expect(lines).toContain('  For: 600,000, 600,000');
   });
+
+  it('ends VERIFIED when the votes with problems cannot change the outcome', () => {
+    const lines = formatReport({
+      ...verification,
+      voters: [{ ...voter, problems: ['signature is not valid for the voter'] }],
+    }).split('\n');
+
+    expect(lines.at(-1)).toBe('VERIFIED: the outcome holds with the 1 votes with problems cast For or Against');
+  });
 });
