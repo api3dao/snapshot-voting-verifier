@@ -16,7 +16,8 @@ export const MORPHO: Address = '0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb';
 export const REGISTRY: Address = '0x469788fe6e9e9681c6ebf3bf78e7fd26fc015446';
 export const USDC: Address = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
 
-// The test Morpho market with API3 as collateral, see snapshot/README.md
+// The mock API3/USDC market on Morpho Blue the fixture supplies collateral to, deployed for the rehearsals before the
+// Kabu market existed: USDC loan asset, API3 collateral, LLTV 62.5%, Adaptive Curve IRM, and nobody supplies USDC to it
 export const MORPHO_MARKET = {
   loanToken: USDC,
   collateralToken: API3,
