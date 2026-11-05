@@ -47,6 +47,13 @@ const blockTimestampIfMined = async (client: PublicClient, blockNumber: bigint) 
   throw result.error;
 };
 
+// The problems found on a pinned vote, or the first line of the error that kept it from being checked: viem and ox
+// add the call data and the RPC URL below it
+const pinnedVoteProblems = async (client: PublicClient, proposal: HubProposal, vote: HubVote) => {
+  const result = await go(() => verifyVoteSignature(client, proposal, vote));
+  return result.success ? result.data : [`pinned vote not checked: ${String(result.error).split('\n')[0]}`];
+};
+
 export type VoterResult = {
   vote: HubVote;
   choice: number;
@@ -146,7 +153,7 @@ export const verifyProposal = async (
       voterProblems.push('cast outside the voting window');
     }
     const choice = parseBasicChoice(vote.choice, proposal.choices.length);
-    voterProblems.push(...(await verifyVoteSignature(client, proposal, vote)));
+    voterProblems.push(...(await pinnedVoteProblems(client, proposal, vote)));
     voters.push({
       vote,
       choice,

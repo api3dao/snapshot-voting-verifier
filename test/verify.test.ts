@@ -2,7 +2,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { type Address, type PublicClient, hashTypedData } from 'viem';
+import { type Address, HttpRequestError, type PublicClient, createPublicClient, hashTypedData, http } from 'viem';
+import { mainnet } from 'viem/chains';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { cidOf } from '../src/cid';
@@ -54,6 +55,8 @@ const start = received + 60;
 const end = start + 7 * 86_400;
 const tied = start + 3600;
 
+const alice: Address = '0x000000000000000000000000000000000000000a';
+const bob: Address = '0x000000000000000000000000000000000000000b';
 const voterAt = (index: number) => `0x1${index.toString(16).padStart(39, '0')}` as Address;
 
 const tokens = (amount: number) => BigInt(amount) * 10n ** 18n;
@@ -240,6 +243,28 @@ const verifyWith = async (
 
 describe('verifyProposal', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it("reports a signature ending in an empty ERC-8010 suffix, which viem throws on, as the vote's problem", async () => {
+    const sig = `0x${'00'.repeat(64)}${'8010'.repeat(16)}`;
+    // viem throws on the suffix before it calls the RPC, so the test makes no request
+    const { verifyTypedData } = createPublicClient({ chain: mainnet, transport: http() });
+    const verification = await verifyWith([castVote(bob, 2, 1n, { sig })], { verifyTypedData });
+
+    expect(verification.voters.map((voter) => voter.problems)).toEqual([
+      ['pinned vote not checked: AbiParameters.ZeroDataError: Cannot decode zero data ("0x") with ABI parameters.'],
+    ]);
+  });
+
+  it('keeps the RPC URL out of the problem', async () => {
+    const verifyTypedData = async () => {
+      throw new HttpRequestError({ url: 'https://rpc.example/v2/api-key', status: 429 });
+    };
+    const verification = await verifyWith([castVote(alice, 1, tokens(400))], { verifyTypedData });
+
+    expect(verification.voters.map((voter) => voter.problems)).toEqual([
+      ['pinned vote not checked: HttpRequestError: HTTP request failed.'],
+    ]);
+  });
 
   it('lists every vote when a full page of votes shares one timestamp', async () => {
     const votes = tiedVotes(1000);
