@@ -4,7 +4,7 @@ Recomputes the result of a Snapshot proposal from the chain and says whether the
 
 ## What it checks
 
-The governance rules of the DAO migration proposal are the specification. Every check below implements a sentence of that text or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome, noted below.
+The governance rules of the DAO migration proposal are the specification. Every check below implements a sentence of that text or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome and the checks of a vote that cannot change it, noted below.
 
 What the hub has to show:
 
@@ -33,9 +33,11 @@ What every vote has to satisfy:
 - The choice is an option of the proposal and the vote was cast between `start` and `end`.
 - The voter's power recomputed at the snapshot block with the proposal's own strategies equals what the hub lists, in total and per strategy, within one part in a billion. Balances and contract state come straight from an archive RPC and delegations from the delegate registry's events, without Snapshot's score API or subgraph in the loop.
 
+A vote that fails one of these checks is still counted and listed with its problems. The votes that fail them end the run `NOT VERIFIED` if the outcome changes with their power, the hub's or the recomputed one whichever is larger, cast For or Against instead, and in a space without a rule set whatever their power.
+
 What the tally has to satisfy:
 
-- The recomputed powers summed per choice equal the hub's scores, within the same tolerance.
+- The recomputed powers summed per choice equal the hub's scores, within the same tolerance, taking the hub's power for a vote that fails one of the checks above.
 
 The rules of `api3.eth`, printed next to the tally for the signers to tick and judged on the recomputed result:
 

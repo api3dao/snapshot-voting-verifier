@@ -5,6 +5,8 @@ import { addressSchema, strategySchema } from './schemas';
 
 const HUB_URL = 'https://hub.snapshot.org/graphql';
 const VOTES_PAGE_SIZE = 1000;
+// The longest id_in list the hub takes, it answers a longer one with status 500
+const IDS_PAGE_SIZE = 100;
 
 const proposalSchema = z.strictObject({
   id: z.string(),
@@ -182,7 +184,7 @@ export const fetchSettingsAfter = async (space: string, mci: number) => {
 
 const VOTE_FIELDS = 'id ipfs voter choice vp vp_by_strategy vp_state created reason app metadata';
 
-export const fetchVotes = async (proposalId: string) => {
+export const fetchVotes = async (proposalId: string, space: string) => {
   const votesById = new Map<string, HubVote>();
   let createdCursor = 0;
   while (true) {
@@ -197,7 +199,44 @@ export const fetchVotes = async (proposalId: string) => {
     for (const vote of page) votesById.set(vote.id, vote);
     if (page.length < VOTES_PAGE_SIZE) break;
     const lastCreated = page.at(-1)!.created;
-    if (lastCreated === createdCursor) throw new Error('Cannot page through votes, too many share one timestamp');
+    if (lastCreated === createdCursor) {
+      // A full page signed with the cursor's timestamp: the space's vote messages signed with it name all its votes, in
+      // the order the hub received them
+      let mciCursor = 0;
+      while (true) {
+        const sameTimestamp = await graphql(
+          `
+            query ($space: String!, $timestamp: Int!, $mci: Int!, $first: Int!) {
+              messages(
+                first: $first
+                where: { space: $space, type: "vote", timestamp: $timestamp, mci_gt: $mci }
+                orderBy: "mci"
+                orderDirection: asc
+              ) {
+                id
+                mci
+              }
+            }
+          `,
+          { space, timestamp: createdCursor, mci: mciCursor, first: IDS_PAGE_SIZE }
+        );
+        const messages = z
+          .array(z.strictObject({ id: z.string(), mci: z.number().int() }))
+          .parse(sameTimestamp.messages);
+        if (messages.length === 0) break;
+        const tied = await graphql(
+          `query ($proposal: String!, $first: Int!, $ids: [String!]!) {
+            votes(first: $first, where: { proposal: $proposal, id_in: $ids }) { ${VOTE_FIELDS} }
+          }`,
+          { proposal: proposalId, first: VOTES_PAGE_SIZE, ids: messages.map((message) => message.id) }
+        );
+        for (const vote of z.array(voteSchema).parse(tied.votes)) votesById.set(vote.id, vote);
+        if (messages.length < IDS_PAGE_SIZE) break;
+        mciCursor = messages.at(-1)!.mci;
+      }
+      createdCursor += 1;
+      continue;
+    }
     createdCursor = lastCreated;
   }
   return [...votesById.values()].sort((a, b) => a.created - b.created || a.id.localeCompare(b.id));

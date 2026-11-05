@@ -6,6 +6,9 @@ const formatScore = (score: number) => score.toLocaleString('en-US', { maximumFr
 
 const formatDate = (timestamp: number) => new Date(timestamp * 1000).toISOString();
 
+const escapeControlCharacters = (line: string) =>
+  line.replaceAll(/\p{Cc}/gu, (char) => `\\u${char.codePointAt(0)!.toString(16).padStart(4, '0')}`);
+
 const formatPower = (power: VotingPower, subSymbols: string[]) => {
   const holdings = (scores: VotingPower['own']) =>
     scores.map((score, index) => `${formatScore(scoreOf(score))} ${subSymbols[index]}`).join(', ');
@@ -45,6 +48,11 @@ const formatVerdict = (verification: Verification) => {
   const votersWithProblems = verification.voters.filter((voter) => voter.problems.length > 0);
   if (verification.problems.length === 0 && votersWithProblems.length === 0) {
     return ['VERIFIED: every vote and the result match the recomputation'];
+  }
+  if (verification.problems.length === 0) {
+    return [
+      `VERIFIED: the outcome holds with the ${votersWithProblems.length} votes with problems cast For or Against`,
+    ];
   }
   return [
     `NOT VERIFIED: ${verification.problems.length} proposal problems, ${votersWithProblems.length} votes with problems`,
@@ -97,5 +105,5 @@ export const formatReport = (verification: Verification) => {
     '',
     ...formatVerdict(verification),
   ];
-  return lines.join('\n');
+  return lines.map((line) => escapeControlCharacters(line)).join('\n');
 };
