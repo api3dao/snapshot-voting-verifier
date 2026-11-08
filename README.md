@@ -6,6 +6,8 @@ Recomputes the result of a Snapshot proposal from the chain and says whether the
 
 The governance rules of the DAO migration proposal are the specification. Every check below implements a sentence of that text or guards the recomputation, a difference between the two is a bug in the tool, and `main` is the version the signers run. A failed check ends the run `NOT VERIFIED`, except the two rules that only decide the outcome and the checks of a vote that cannot change it, noted below.
 
+A bug fix is not a rule change. The rules are the text, the tool only implements them, so a fix that brings the tool back to the text lands on `main` as soon as it is reviewed, with no 30 day delay. The delay is for a change of the rules themselves, which starts as a proposal and reaches the tool only once it takes effect.
+
 What the hub has to show:
 
 - The proposal is a `basic` or `single-choice` one, anything else stops the run.
