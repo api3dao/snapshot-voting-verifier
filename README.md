@@ -78,7 +78,7 @@ pnpm run power --space api3.eth --address 0x<holder> --block 25000000
 - `pnpm exec ts-node --transpileOnly fixture/setup.ts --rpc-url <url> --mainnet` is how the state was put in place: it funds the wallets and the vesting and sets every source and delegation. Each step is skipped when the chain already shows it, so rerunning it is harmless. Against a local `anvil --fork-url` it is a dry run. The vesting was deployed once, a DelegatedVesting of the time with the test space id, and is never deployed again.
 - `pnpm exec ts-node --transpileOnly fixture/proposal.ts --rpc-url <url> --create` published the proposal from the agent wallet and `--vote <id>` cast the two votes, both gasless signatures sent to the sequencer.
 
-`test/production.e2e.test.ts` checks that the `api3.eth` space on the hub runs the pinned settings, runs their strategies at a recent block over the fixture wallets, the Vault Safe with its delegated pool stake, a holder with Kabu market collateral and the Treasury and Agent Safes delegated to the dead address, and checks every source against the raw reads and every wallet against the score API.
+`test/production.e2e.test.ts` checks that the `api3.eth` space on the hub runs the pinned settings, runs their strategies at a recent block over the fixture wallets, a holder with millions of API3 of pool stake delegated to it, a holder with Kabu market collateral and the Treasury and Agent Safes delegated to the dead address, and checks every source against the raw reads and every wallet against the score API.
 
 ## Development checks
 

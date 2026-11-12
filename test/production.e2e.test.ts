@@ -18,8 +18,8 @@ import { type Holdings, asFloat, morphoMarketIdOf, readHoldings, totalPower } fr
 
 // The strategies the api3.eth space gets, taken from the settings file, run over wallets that hold API3 in every
 // place the file reads: the fixture wallets with their registry and pool delegations, a holder with collateral in the
-// Kabu market, and the Vault Safe with its delegated pool shares. The recomputation has to match the raw reads and
-// what Snapshot's score API computes from the same file, at a recent block
+// Kabu market, and a holder with millions of API3 of pool stake delegated to it. The recomputation has to match the
+// raw reads and what Snapshot's score API computes from the same file, at a recent block
 
 // The pinned api3.eth settings, the ones the space runs. SETTINGS_PATH points the test at another file, settings to
 // be signed for instance
@@ -29,7 +29,7 @@ const SCORE_API_URL = 'https://score.snapshot.org';
 // finalize a block
 const BLOCKS_BEHIND_HEAD = 64n;
 
-const VAULT: Address = '0x8e03609ed680b237c7b6f8020472ca0687308b24';
+const POOL_DELEGATE: Address = '0x43f9dd0b4ea4e84d622be1e7e56170999692790f';
 const KABU_COLLATERAL_HOLDER: Address = '0x1946a1dd383fe3c3cd9ae3066c638ef6ed7e35e5';
 // The two Safes that hold the DAO's API3 after the migration vote, both delegated to the dead address under the
 // production space id since 2026-10-26, so what they hold votes for nobody
@@ -51,7 +51,7 @@ const fixtureAddresses: Address[] = [
   overrider.address,
   chained.address,
 ];
-const addresses: Address[] = [...fixtureAddresses, VAULT, KABU_COLLATERAL_HOLDER];
+const addresses: Address[] = [...fixtureAddresses, POOL_DELEGATE, KABU_COLLATERAL_HOLDER];
 
 const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as { network: string; strategies: unknown };
 const strategies: Strategy[] = z.array(strategySchema).parse(settings.strategies);
@@ -284,11 +284,10 @@ describe('wallets outside the fixture', () => {
     expectScore(scoreOf(power.own[4]!), asFloat(of.collateral));
   });
 
-  it('credits the Vault Safe with the pool shares delegated to it', () => {
-    const of = holdings[VAULT]!;
-    const power = powers[VAULT]!;
+  it('credits a holder with the pool shares delegated to it', () => {
+    const of = holdings[POOL_DELEGATE]!;
+    const power = powers[POOL_DELEGATE]!;
 
-    expect(of.staked).toBe(0n);
     expect(of.pool).toBeGreaterThan(1_000_000);
 
     expectScore(scoreOf(power.own[1]!), of.pool);
